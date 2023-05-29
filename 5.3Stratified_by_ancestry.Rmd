@@ -1,0 +1,11 @@
+---
+title: "5.2 Stratified for Dominant ancestry"
+author: "Tianshu Liu"
+date: "2023-05-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+

@@ -1,0 +1,182 @@
+---
+title: "5.2 Stratified by sex"
+author: "Tianshu Liu"
+date: "2023-05-17"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,include=FALSE}
+rm(list=ls())
+#set working directory load package-----------------
+working_path<-'/well/emberson/users/hma817/projects/existing_PRS'
+data_path<-paste(working_path,'/data',sep='')
+graphs_path<-paste(working_path,'/graphs',sep='')
+setwd(working_path)
+
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(pROC)
+library(ROCR)
+library(caret)
+library(corrplot)
+library(DescTools)
+library(flextable)
+library(survival)
+library(survminer)
+library(ggfortify)
+library(dynpred)
+source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
+source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
+```
+
+```{r,include=FALSE}
+final_data<-readRDS(paste(data_path,"analysis_data_16May2023.rds",sep="/"))
+
+variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
+  variant_t<-data.frame(t(variants_included))
+  colnames(variant_t)<-variant_t[1,]
+  variant_t<-variant_t[2,]
+  variant_t<-cbind(rownames(variant_t),variant_t)
+  colnames(variant_t)[1]<-NA
+  colnames(variant_t)[8]<-"custom_Oni_Orisan"
+  variant_t[1,1]<-"Number of SNPs"
+
+final_data$EPA001_up<-ifelse(is.na(final_data$EPA001)==F&final_data$EPA001==1,1,0)
+final_data$EPA001_up<-as.numeric(final_data$EPA001_up)
+final_data$EPO001_up<-ifelse(is.na(final_data$EPO001)==F&final_data$EPO001==1,1,0)
+final_data$EPO001_up<-as.numeric(final_data$EPO001_up)
+ PCs<-c(paste0("PC",1:7)) 
+```
+
+#stratified by sex EPA001
+```{r,include=FALSE}
+data_female<-final_data[final_data$SEX=="Female",]
+data_male<-final_data[final_data$SEX=="Male",]
+```
+
+
+```{r,echo=FALSE}
+table(final_data$prevalent_CHD_EPA)
+table(final_data$SEX)
+prop.table(table(data_female$prevalent_CHD_EPA))
+prop.table(table(data_male$prevalent_CHD_EPA))
+```
+```{r,include=FALSE}
+partial_adjustment=c("AGE")
+full_adjustments = c("WHRATIO","SBP","DBP","EDU_LEVEL","smokegp","diabetes_at_baseline")
+```
+
+##Female
+```{r}
+model_withoutPRS_EPA_female<-discrimination_without_prs(train_data = data_female,test_data = data_female,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPA",partial_adjustment = c("AGE"))
+print(model_withoutPRS_EPA_female)
+saveRDS(model_withoutPRS_EPA_female,paste(data_path,"/Prevalent_CHD_EPA_withoutPRSF.rds",sep=""))
+```
+
+```{r,include=FALSE}
+prs_table_EPA_female<-output_table_summary(outcome="prevalent_CHD_EPA",data=data_female,full_adjustments,trainsplit=F,partial_adjustment = c("AGE"),name="F")
+```
+```{r,include=FALSE}
+saveRDS(prs_table_EPA_female,paste(data_path,"/Prevalent_CHD_EPA_model_outcomesF_09May_2023.rds",sep=""))
+prs_table_EPA_cont_female<-prs_table_EPA_female[[1]]
+prs_table_EPA_cat_female<-prs_table_EPA_female[[2]]
+```
+```{r}
+flex_cont<-my_table(prs_table_EPA_cont_female,y=c(1,2,7,12),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+```
+```{r}
+flex_cat<-my_table(prs_table_EPA_cat_female,y=c(1,2,8,14),x=1:8)
+flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
+flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+
+my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
+```
+
+##male
+```{r,echo=FALSE}
+model_withoutPRS_EPA_male<-discrimination_without_prs(train_data = data_male,test_data = data_male,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPA",partial_adjustment = c("AGE"))
+print(model_withoutPRS_EPA_male)
+saveRDS(model_withoutPRS_EPA_male,paste(data_path,"/Prevalent_CHD_EPA_withoutPRSM.rds",sep=""))
+```
+```{r,include=FALSE}
+prs_table_EPA_male<-output_table_summary(outcome="prevalent_CHD_EPA",data=data_male,full_adjustments,trainsplit=F,partial_adjustment = c("AGE"),name="M")
+```
+```{r,include=FALSE}
+saveRDS(prs_table_EPA_male,paste(data_path,"/Prevalent_CHD_EPA_model_outcomesM_09May_2023.rds",sep=""))
+prs_table_EPA_cont_male<-prs_table_EPA_male[[1]]
+prs_table_EPA_cat_male<-prs_table_EPA_male[[2]]
+```
+
+```{r,echo=FALSE}
+flex_cont<-my_table(prs_table_EPA_cont_male,y=c(1,2,7,12),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+```
+```{r,echo=FALSE}
+flex_cat<-my_table(prs_table_EPA_cat_male,y=c(1,2,8,14),x=1:8)
+flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
+flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+
+my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
+```
+#EPO001
+##female
+```{r,echo=FALSE}
+model_withoutPRS_EPO_female<-discrimination_without_prs(train_data = data_female,test_data = data_female,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPO",partial_adjustment = c("AGE"))
+print(model_withoutPRS_EPO_female)
+```
+```{r,include=FALSE}
+prs_table_EPA_female<-output_table_summary(outcome="prevalent_CHD_EPO",data=data_female,full_adjustments,trainsplit=F,partial_adjustment = c("AGE"),name="F")
+
+
+```
+
+```{r,include=FALSE}
+saveRDS(prs_table_EPA_female,paste(data_path,"/Prevalent_CHD_EPO_model_outcomesF_18May_2023.rds",sep=""))
+prs_table_EPO_cont_female<-prs_table_EPA_female[[1]]
+prs_table_EPO_cat_female<-prs_table_EPA_female[[2]]
+```
+```{r,echo=FALSE}
+flex_cont<-my_table(prs_table_EPO_cont_female,y=c(1,2,7,12),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+```
+## Male
+```{r,echo=FALSE}
+model_withoutPRS_EPO_male<-discrimination_without_prs(train_data = data_male,test_data = data_male,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPO",partial_adjustment = c("AGE"))
+print(model_withoutPRS_EPO_male)
+
+```
+```{r,echo=FALSE}
+prs_table_EPO_male<-output_table_summary(outcome="prevalent_CHD_EPO",data=data_male,full_adjustments,trainsplit=F,partial_adjustment = c("AGE"),name="M")
+```
+
+
+```{r,echo=FALSE}
+saveRDS(prs_table_EPO_male,paste(data_path,"/Prevalent_CHD_EPO_model_outcomesM_09May_2023.rds",sep=""))
+prs_table_EPO_cont_male<-prs_table_EPO_male[[1]]
+prs_table_EPO_cat_male<-prs_table_EPO_male[[2]]
+```
+
+```{r}
+flex_cont<-my_table(prs_table_EPO_cont_male,y=c(1,2,7,12),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+```
+
+```{r}
+flex_cat<-my_table(prs_table_EPO_cat_male,y=c(1,2,8,14),x=1:8)
+flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
+flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+
+my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
+```
+

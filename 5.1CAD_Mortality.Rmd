@@ -1,0 +1,200 @@
+---
+title: "5.1 Secondary Analysis (CAD mortality)"
+author: "Tianshu Liu"
+date: "2023-05-11"
+output: word_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#call packages and data
+##package and self-create function
+```{r, include=FALSE}
+rm(list=ls())
+#set working directory load package-----------------
+working_path<-'/well/emberson/users/hma817/projects/existing_PRS'
+data_path<-paste(working_path,'/data',sep='')
+graphs_path<-paste(working_path,'/graphs',sep='')
+setwd(working_path)
+
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(pROC)
+library(ROCR)
+library(caret)
+library(corrplot)
+library(DescTools)
+library(flextable)
+library(survival)
+library(survminer)
+library(ggfortify)
+library(dynpred)
+source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
+source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
+```
+
+##data
+```{r,include=FALSE}
+final_data<-readRDS(paste(data_path,"analysis_data_16May2023.rds",sep="/"))
+
+variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
+  variant_t<-data.frame(t(variants_included))
+  colnames(variant_t)<-variant_t[1,]
+  variant_t<-variant_t[2,]
+  variant_t<-cbind(rownames(variant_t),variant_t)
+  colnames(variant_t)[1]<-NA
+  colnames(variant_t)[8]<-"custom_Oni_Orisan"
+  variant_t[1,1]<-"Number of SNPs"
+
+final_data$EPA001_up<-ifelse(is.na(final_data$EPA001)==F&final_data$EPA001==1,1,0)
+final_data$EPA001_up<-as.numeric(final_data$EPA001_up)
+final_data$EPO001_up<-ifelse(is.na(final_data$EPO001)==F&final_data$EPO001==1,1,0)
+final_data$EPO001_up<-as.numeric(final_data$EPO001_up)
+ PCs<-c(paste0("PC",1:7)) 
+```
+
+```{r,echo=FALSE}
+final_data$ends_75<-ifelse(final_data$AGE_now<75,1,0)
+final_data$age_group<-ifelse(final_data$AGE_now>=75,"Over 75",ifelse(
+  final_data$AGE_now<75&final_data$AGE_now>=65,"65-74",ifelse(
+    final_data$AGE_now<65&final_data$AGE_now>=55,"55-64",ifelse(
+      final_data$AGE_now<55&final_data$AGE_now>=35,"35-54",final_data$AGE_now
+    )
+  )
+))
+
+table(final_data$age_group,final_data$EPA001_up,exclude = NULL)
+
+```
+
+
+```{r}
+final_data_before75<-final_data[final_data$ends_75==1,]
+```
+
+
+
+```{r}
+table(final_data_before75$EPA001_up)
+table(final_data_before75$EPO001_up)
+```
+
+
+```{r,include=FALSE}
+mort_fit1<-survfit(Surv(AGE_now,EPA001_up)~diabetes_at_baseline, final_data)
+mort_fit2<-survfit(Surv(final_data$AGE_now,final_data$EPA001_up)~SEX, final_data)
+mort_fit3<-survfit(Surv(final_data$AGE_now,final_data$EPA001_up)~EDU_LEVEL, final_data)
+mort_fit4<-survfit(Surv(final_data$AGE_now,final_data$EPA001_up)~smokegp, final_data)
+
+
+```
+```{r,echo=FALSE}
+
+ggsurvplot(mort_fit1, data = final_data,risk.table = T,pval = T)
+ggsurvplot(mort_fit2, data = final_data,risk.table = T,pval = T)
+ggsurvplot(mort_fit3, data = final_data,risk.table = T,pval = T)
+ggsurvplot(mort_fit4, data = final_data,risk.table = T,pval = T)
+
+covariate<-c("Baseline diabetes","Gender","Education level","Smoking status")
+fit_list<-list(mort_fit1,mort_fit2,mort_fit3,mort_fit4)
+for (i in 1:4){
+  
+  p<-ggsurvplot(fit_list[[i]], data = final_data,risk.table = T,pval = T)
+  jpeg(paste(graphs_path,"/KM_plot_",covariate[i],".jpg",sep=""),width = 1000,height = 800)
+  print(p)
+  
+  dev.off()
+}
+```
+
+##premature deaths------
+
+
+
+```{r,echo=FALSE}
+model_no_prs<-coxph(Surv(AGE_now,EPA001_up)~SEX+PC1+PC2+PC3+PC4+PC5+PC6+PC7+EDU_LEVEL+smokegp+SBP+DBP+WHRATIO+diabetes_at_baseline, final_data_before75)
+summary(model_no_prs)
+cox.zph(model_no_prs)
+```
+
+
+```{r,echo=FALSE}
+summary(coxph(Surv(AGE_now,EPA001_up)~diabetes_at_baseline+SEX+SBP+DBP+EDU_LEVEL+smokegp+WHRATIO+PC1+PC2+PC3+PC4+PC5+PC6+PC7, final_data_before75))
+```
+
+### CAD mortality as EPA001
+```{r,include=FALSE}
+#plot km plot for catgorical prs
+#start_column=which( colnames(final_data)%in%paste(colnames(variant_t),"_cat",sep=""))
+#for (i in 1:7){
+  
+#  p<-ggsurvplot(survfit(create_surv_formula(model_type="simple",data=final_data,full_adjustments,outcome="EPA001_up",pgs_name=colnames(final_data)[start_column[i]]), data = final_data),pval = T,risk.table = T)
+#  jpeg(paste(graphs_path,"/KM_plot_",colnames(final_data)[start_column[i]],".jpg",sep=""),width = 1000,height = 800)
+#  print(p)
+  
+#  dev.off()
+#}
+```
+
+```{r,include=FALSE}
+full_adjustments = c("WHRATIO","SBP","DBP","EDU_LEVEL","smokegp","diabetes_at_baseline")
+```
+
+
+```{r,include=FALSE}
+outcome="EPA001_up"
+data=final_data_before75
+
+```
+```{r,include=FALSE}
+
+
+EPA001_cox<-output_table_summary_cox(data=final_data,outcome="EPA001_up",full_adjustments = full_adjustments)
+#saveRDS(EPA001_cox,paste(data_path,"/EPA001_model_outcomes_17May2023.rds",sep=""))
+```
+
+```{r,include=FALSE}
+EPA001_cont<-EPA001_cox[[1]]
+EPA001_cat<-EPA001_cox[[2]]
+
+```
+
+```{r,echo=FALSE}
+flex_cont<-my_table(EPA001_cont,y=c(1,2,5,8),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,5,8),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+flex_cont <- add_header_row(flex_cont, values =  c(" ", "Polygenic risk scores"),
+    colwidths = c(1, 7), top = T)
+
+
+
+my_theme(flex_cont,y=c(1,4,7),set_padding = 3)
+```
+```{r,echo=FALSE}
+flex_cat<-my_table(EPA001_cat,y=c(1,2,6,10),x=1:8)
+flex_cat<-footnote(flex_cat,i=c(2,6,10),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cat,y=c(1,5,9,13),z=1:8)
+```
+
+```{r,include=FALSE}
+EPO001_cox<-output_table_summary_cox(data=final_data,outcome="EPO001_up",full_adjustments = full_adjustments)
+saveRDS(EPO001_cox,paste(data_path,"/EPO001_model_outcomes_17May2023.rds",sep=""))
+```
+```{r,include=FALSE}
+EPO001_cont<-EPO001_cox[[1]]
+EPO001_cat<-EPO001_cox[[2]]
+```
+
+```{r,echo=FALSE}
+flex_cont<-my_table(EPO001_cont,y=c(1,2,5,8),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(2,5,8),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cont,y=c(1,4,7,10),z=1:8)
+```
+```{r,echo=FALSE}
+flex_cat<-my_table(EPO001_cat,y=c(1,2,6,10),x=1:8)
+flex_cat<-footnote(flex_cat,i=c(2,6,10),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
+my_theme(flex_cat,y=c(1,5,9,13),z=1:8)
+```
+
