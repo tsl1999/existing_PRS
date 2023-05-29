@@ -45,7 +45,7 @@ data_age_risk_expand<-data_age_risk%>%crossing(tibble(XAgeGrp_start = agegroup[-
 
 #start each interval on the month and date of recruitment--------------------
 #2/29
-data_age_risk_expand$start_int<-(as.Date(data_age_risk_expand$DATE_RECRUITED)-(data_age_risk_expand$AGE)*365.25+(data_age_risk_expand$XAgeGrp_start)*365.25)
+data_age_risk_expand$start_int<-(as.Date(data_age_risk_expand$DATE_RECRUITED)%m-%years(data_age_risk_expand$AGE)%m+%years(data_age_risk_expand$XAgeGrp_start))
 #remove intervals start after death date/censoring date and before recruitment date -----------------
 
 data_age_risk_expand$end_date<-ifelse(data_age_risk_expand$endpoint==1,as.character(data_age_risk_expand$DATE_OF_DEATH),ifelse(
@@ -56,7 +56,7 @@ data_age_risk_expand$end_date<-as.Date(data_age_risk_expand$end_date)
 
 data_age_risk_expand<-data_age_risk_expand%>%filter(start_int <= as.Date(end_date))
 
-data_age_risk_expand$end_int<-as.Date(data_age_risk_expand$DATE_RECRUITED)-(data_age_risk_expand$AGE)*365.25+(data_age_risk_expand$XAgeGrp_end)*365.25-1
+data_age_risk_expand$end_int<-as.Date(data_age_risk_expand$DATE_RECRUITED)%m-%years(data_age_risk_expand$AGE)%m+%years(data_age_risk_expand$XAgeGrp_end)%m-%days(1)
 
 data_age_risk_expand<-data_age_risk_expand%>%filter(end_int>= as.Date(DATE_RECRUITED))
 
@@ -98,7 +98,6 @@ data_age_risk_expand_final$endpoint_CAD<-ifelse(data_age_risk_expand_final$endpo
 saveRDS(data_age_risk_expand_final,paste(data_path,"/FullDate_standardisedPRS_age_at_risk_29May2023.rds",sep=""))
 
 
-data$IID[data$EPA001_up==1][!data$IID[data$EPA001_up==1]%in%data_age_risk_expand_final$IID[data_age_risk_expand_final$endpoint_CAD==1]==T]
 
 
 
