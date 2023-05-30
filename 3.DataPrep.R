@@ -65,8 +65,8 @@ data$date_since_recruitment<-as.Date("2020-12-31","%Y-%m-%d")-as.Date(data$DATE_
 data$yr_since_recruitment<-as.numeric(data$date_since_recruitment)/365.25
 data$yrs_died_recruitment<-(as.Date(data$DATE_OF_DEATH,"%d/%m/%Y")-as.Date(data$DATE_RECRUITED,"%d%b%Y"))/365.25
 
-data$AGE_followup<-ifelse(is.na(data$yrs_died_recruitment)==F,round(data$AGE+data$yrs_died_recruitment),ifelse(
-  is.na(data$yrs_died_recruitment)==T, round(data$AGE+data$yr_since_recruitment),NA
+data$AGE_followup<-ifelse(is.na(data$yrs_died_recruitment)==F,round(data$AGE+data$yrs_died_recruitment,4),ifelse(
+  is.na(data$yrs_died_recruitment)==T, round(data$AGE+data$yr_since_recruitment,4),NA
 ))
 
 data$anti_diabetic<-rowSums(data%>%select(contains("DRUG")))
