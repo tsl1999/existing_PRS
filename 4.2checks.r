@@ -121,7 +121,7 @@ exp(coef(run_glm(model_type = "full",data=data,full_adjustments = full_adjustmen
 
 
 exp(coef(glm(prevalent_CHD_EPA~PGS001780,data=data,family=binomial(link='logit'))))
-exp(coef(glm(prevalent_CHD_EPA~PGS001780+AGE,data=data,family=binomial(link='logit'))))
+exp(coef(glm(prevalent_CHD_EPA~PGS001780+AGE+SEX,data=data,family=binomial(link='logit'))))
 
 exp(coef(glm(prevalent_CHD_EPA~PGS001780+AGE+PC1,data=data,family=binomial(link='logit'))))
 

@@ -59,7 +59,7 @@ table(data$prevalent_CHD_EPA)#8059   7616
 table(data$prevalent_CHD_EPO)#7222   6834
 
 
-data$AGE_75<-ifelse(data$AGE>75,NA,data$AGE)
+data$AGE_75<-ifelse(data$AGE>=75,NA,data$AGE)
 sum(is.na(data$AGE_75))
 data$date_since_recruitment<-as.Date("2020-12-31","%Y-%m-%d")-as.Date(data$DATE_RECRUITED,"%d%b%Y")
 data$yr_since_recruitment<-as.numeric(data$date_since_recruitment)/365.25
@@ -153,21 +153,22 @@ ggplot(data = dt_melt_standardised, aes(x=value)) +
   geom_density(aes(group=prevalent_CHD_EPA,fill=prevalent_CHD_EPA), alpha = 0.4)+xlab("Polygenic risk score")+
   facet_wrap( ~ variable,scales = "free")+scale_fill_discrete(name = " ")+ggtitle("PRS distribution by case/non-case (EPA)")
 
-#ggsave(paste(graphs_path,"/PRS_standardised_byCaseCtrl_EPA_24May2023.png",sep=""),width = 10, height = 8)
+#ggsave(paste(graphs_path,"/PRS_standardised_byCaseCtrl_EPA_31May2023.png",sep=""),width = 10, height = 8)
 
 
 
 ggplot(data = dt_melt_standardised, aes(x=value)) + 
   geom_density(aes(group=SEX,fill=SEX), alpha = 0.4)+xlab("Polygenic risk score")+
   facet_wrap( ~ variable,scales = "free")+scale_fill_discrete(name = " ")+ggtitle("PRS distribution by gender")
-#ggsave(paste(graphs_path,"/PRS_standardised_bysex_24May2023.png",sep=""),width = 10, height = 8)
+
+  #ggsave(paste(graphs_path,"/PRS_standardised_bysex_31May2023.png",sep=""),width = 10, height = 8)
 
 
 
 ggplot(data = dt_melt_standardised, aes(x=value)) + xlab("Polygenic risk score")+
   geom_density(aes(group=prevalent_CHD_EPO,fill=prevalent_CHD_EPO), alpha = 0.4)+
   facet_wrap( ~ variable,scales = "free")+scale_fill_discrete(name = " ")+ggtitle("PRS distribution by case/non-case (EPO)")
-#ggsave(paste(graphs_path,"/PRS_standardised_byCaseCtrl_EPO_24May2023.png",sep=""),width = 10, height = 8)
+#ggsave(paste(graphs_path,"/PRS_standardised_byCaseCtrl_EPO_31May2023.png",sep=""),width = 10, height = 8)
 
 data_keep$prevalent_CHD_EPA<-factor(data_keep$prevalent_CHD_EPA,levels = c(0,1),labels = c("No CAD","CAD case"))
 
@@ -175,15 +176,15 @@ data_keep$prevalent_CHD_EPA<-factor(data_keep$prevalent_CHD_EPA,levels = c(0,1),
 
 ggplot(data = data_keep, aes(x=AGE)) + 
   geom_density(aes(group=prevalent_CHD_EPA,fill=prevalent_CHD_EPA), alpha = 0.4)+scale_fill_discrete(name = " ")+ggtitle("Age at baseline distribution by case/non-case (EPA)")
-#ggsave(paste(graphs_path,"/Age_at_recruitment_byCaseCtrl_EPA_24May2023.png",sep=""),width = 10, height = 8)
+#ggsave(paste(graphs_path,"/Age_at_recruitment_byCaseCtrl_EPA_31May2023.png",sep=""),width = 10, height = 8)
 
 
 ggplot(data = data_keep, aes(x=AGE_followup)) + xlab("Age at risk")+
   geom_density(aes(group=prevalent_CHD_EPA,fill=prevalent_CHD_EPA), alpha = 0.4)+scale_fill_discrete(name = " ")+ggtitle("Age at risk distribution by case/non-case (EPA)")
 
-#ggsave(paste(graphs_path,"/Age_now_byCaseCtrl_EPA_24May2023.png",sep=""),width = 10, height = 8)
+#ggsave(paste(graphs_path,"/Age_now_byCaseCtrl_EPA_31May2023.png",sep=""),width = 10, height = 8)
 
 
-#saveRDS(prs,paste(data_path,"PRS_standardised_18Apr2023.rds",sep="/"))
-#saveRDS(prs_standardised,paste(data_path,"FullData_standardisedPRS_29May2023.rds",sep="/"))
-#saveRDS(data_table_1_standardised,paste(data_path,"Table1_data_standardisedPRS_07May2023.rds",sep="/"))
+#saveRDS(prs,paste(data_path,"PRS_standardised_31Apr2023.rds",sep="/"))
+#saveRDS(prs_standardised,paste(data_path,"FullData_standardisedPRS_31May2023.rds",sep="/"))
+#saveRDS(data_table_1_standardised,paste(data_path,"Table1_data_standardisedPRS_31May2023.rds",sep="/"))

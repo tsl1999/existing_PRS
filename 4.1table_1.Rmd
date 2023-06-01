@@ -33,6 +33,8 @@ library(caret)
 library(corrplot)
 library(DescTools)
 library(flextable)
+library(officedown)
+
 
 source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
 source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
@@ -40,10 +42,10 @@ source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
 
 ##data
 ```{r,include=FALSE}
-data<-readRDS(paste(data_path,"FullData_standardisedPRS_03May2023.rds",sep="/"))
-table1_data<-readRDS(paste(data_path,"Table1_data_standardisedPRS_07May2023.rds",sep="/"))
-colnames(data)[33:39]<-sub("_standardised","",colnames(data)[33:39])#remove standardised after all PRS names to make column names shorter
-colnames(data)[39]<-"custom_Oni_Orisan"# change custom_Oni-Orisan to Oni_Orisan so that formula() can read it
+data<-readRDS(paste(data_path,"FullData_standardisedPRS_31May2023.rds",sep="/"))
+table1_data<-readRDS(paste(data_path,"Table1_data_standardisedPRS_31May2023.rds",sep="/"))
+colnames(data)[35:41]<-sub("_standardised","",colnames(data)[35:41])#remove standardised after all PRS names to make column names shorter
+colnames(data)[41]<-"custom_Oni_Orisan"# change custom_Oni-Orisan to Oni_Orisan so that formula() can read it
 
 variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
   variant_t<-data.frame(t(variants_included))
@@ -62,7 +64,7 @@ variant_t[2:8]<-prettyNum(variant_t[2:8], big.mark = ",", scientific = FALSE)
 #Analysis
 ## pairwise correlation check
 ```{r,include=FALSE}
-prs_cor<-cor(data[,33:39],method = "pearson")
+prs_cor<-cor(data[,35:41],method = "pearson")
 jpeg(paste(graphs_path,"/correlation_heatmap",".jpg",sep=""),width = 800, height = 600)
 corrplot(prs_cor, type = "lower", order = "original",method="number", 
          tl.col = "black", tl.srt = 45)
@@ -83,8 +85,8 @@ knitr::include_graphics("/well/emberson/users/hma817/projects/existing_PRS/graph
 ```{r, include==FALSE}
 table(data$SEX,exclude = NULL)#1=male #2=female
 table(data$smokegp,exclude = NULL)
-table(data$prevalent_CHD_EPA,exclude = NULL)#6087 prevalent cases
-table(data$prevalent_CHD_EPO,exclude = NULL)#5445
+table(data$prevalent_CHD_EPA,exclude = NULL)#5488 prevalent cases
+table(data$prevalent_CHD_EPO,exclude = NULL)#4921
 data$diabetes_at_baseline<-factor(data$diabetes_at_baseline,levels = c(0,1))
 ```
 
@@ -92,7 +94,6 @@ data$diabetes_at_baseline<-factor(data$diabetes_at_baseline,levels = c(0,1))
 ## Baseline characteristics
 
 ```{r,include=FALSE}
-table1_data$SEX<-factor(table1_data$SEX,levels = c("Male","Female"),labels = c("Men","Women"))
 table1_data$BASE_CHD<-factor(table1_data$BASE_CHD,levels = c(0,1),labels = c("No","Yes"))
 table1_data$BASE_CVD<-factor(table1_data$BASE_CVD,levels = c(0,1),labels = c("No","Yes"))
 table1_data$BASE_CANCER<-factor(table1_data$BASE_CANCER,levels = c(0,1),labels = c("No","Yes"))
@@ -130,7 +131,7 @@ baseline_up[43,1]<-"\U{00A0}\U{00A0}Diabetes (HBA1C>6.5%, self-report or medicat
 
 
 
-saveRDS(baseline_up,paste(data_path,"/table1_24May2023.rds",sep=""))
+#saveRDS(baseline_up,paste(data_path,"/table1_31May2023.rds",sep=""))
 ```
 
 
@@ -223,7 +224,7 @@ for (i in 1:7){
   list_quintile[i]<-list(pgs_quintile)
 }
 
-#saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_24May2023.rds",sep=""))
+#saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
 ```
 
 

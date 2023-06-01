@@ -16,7 +16,7 @@ library(survival)
 library(Epi)
 
 # data readin-------------
-data<-readRDS(paste(data_path,"FullData_standardisedPRS_29May2023.rds",sep="/"))
+data<-readRDS(paste(data_path,"FullData_standardisedPRS_31May2023.rds",sep="/"))
 data$EPA001_up<-ifelse(is.na(data$EPA001)==F&data$EPA001==1,1,0)
 data$EPA001_up<-as.numeric(data$EPA001_up)
 data$EPO001_up<-ifelse(is.na(data$EPO001)==F&data$EPO001==1,1,0)
@@ -32,6 +32,11 @@ data$DATE_RECRUITED<-as.Date(data$DATE_RECRUITED,"%d%b%Y")
 
 
 
+#saveRDS(data,paste(data_path,"/FullData_standardisedPRS_mortality_31May2023.rds",sep=""))
+
+
+
+#new codes available see 3.1 new--------------------------------------
 data_age_risk<-data%>%select(IID,AGE,DATE_RECRUITED,DATE_OF_DEATH,AGE_followup)
 data_age_risk$endpoint<-ifelse(is.na(data_age_risk$DATE_OF_DEATH)==F&data_age_risk$AGE_followup<75,1,0)
 table(data_age_risk$endpoint)
@@ -115,8 +120,6 @@ table(data_age_risk_expand_final$endpoint_CAD_epo)==table(data$EPO001_up&data_ag
 try1<-coxph(Surv(time=time_in,time2 = time_out,endpoint_CAD_epo)~PGS000018,data=data_age_risk_expand_final)
 summary(try1)
 
-data$AGE_followup<-ifelse(data$AGE_followup>=75,75,data$AGE_followup)
-data$followup<-data$AGE_followup-data$AGE
 
 
 try2<-coxph(Surv(followup,data$EPO001_up&data_age_risk$AGE_followup<75)~PGS000018_standardised,data=data)

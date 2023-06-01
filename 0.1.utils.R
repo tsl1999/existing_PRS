@@ -572,126 +572,6 @@ create_table_1<-function(data,variables_to_select,var_name,by,compare=F,missing=
   
 }
 
-create_surv_formula<-function(model_type,data,full_adjustments,outcome,pgs_name){
-  
-  surv_formula<-paste("Surv(AGE_at_risk,",outcome,")",sep="")
-  
-  if (model_type=="simple"){
-    output_formula=formula(paste(surv_formula,"~",pgs_name,sep=""))
-  }else if (model_type=="partial"){
-    output_formula=formula(paste(surv_formula,"~",paste(pgs_name,"SEX",
-                                                        paste(PCs,collapse="+"),sep="+"),sep=""))
-  }else if (model_type=="full"){
-    output_formula=formula(paste(surv_formula,"~",paste(pgs_name,"SEX",
-                                                        paste(full_adjustments,collapse = "+"),
-                                                        paste(PCs,collapse="+"),sep="+"),sep=""))
-  }else (print("ERROR: NO SUCH MODEL"))
-  
-  output_formula
-  
-}
-
-run_cox<-function(model_type,data,full_adjustments,outcome,pgs_name){
-  cat("\n Modelling ",pgs_name)
-  model_output<-coxph(create_surv_formula(model_type,data,full_adjustments,outcome,pgs_name),data=data)
-  model_output
-}
-
-create_output_table_cox<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,model_type,cat_or_cont="cont", full_adjustments,outcome){
-  
-  if(trainsplit==F){
-    train_data=data
-    test_data=data
-  }else if(trainsplit==T){
-    train_data=train_data
-    test_data=test_data
-  }
-  if (model_type=="simple"){
-    train=train_data
-    test=test_data
-  }else if(model_type=="partial"){
-    train<-na.omit(train_data%>%select(IID,AGE_at_risk,SEX,contains(c("PC","PGS","custom",outcome))))
-    test<-na.omit(test_data%>%select(IID,AGE_at_risk,SEX,contains(c("PC","PGS","custom",outcome))))
-  }else if (model_type=="full"){
-    train<-na.omit(train_data%>%select(IID,AGE_at_risk,SEX,contains(c("PC","PGS","custom",outcome,full_adjustments))))
-    test<-na.omit(train_data%>%select(IID,AGE_at_risk,SEX,contains(c("PC","PGS","custom",outcome,full_adjustments))))
-  }
-  
-  
-  if (cat_or_cont=="cont"){
-    
-    start_column=which( colnames(train)%in%colnames(variant_t))
-    model_output_table<-data.frame(HR=NA,LR=NA,UR=NA,AUC=NA,AUC_LR=NA,AUC_UR=NA)
-    
-    for (i in 1:7){
-      
-      model_output<-run_cox(model_type,data=train,full_adjustments,outcome,pgs_name=colnames(train)[start_column[i]])
-      
-      
-      hr_ci<-round(summary(model_output)$conf.int[1,3:4],3)
-      
-      c_index<-ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var))
-      model_output_table[i,]<-c(summary(model_output)$coefficient[1,2],hr_ci[1],hr_ci[2],
-                                c_index[1],c_index[2],c_index[3])
-      rownames(model_output_table)[i]<-colnames(train)[start_column[i]]
-      
-    }
-    
-    model_output_table
-    
-  }else if (cat_or_cont=="cat"){
-    
-    start_column=which( colnames(train)%in%paste(colnames(variant_t),"_cat",sep=""))
-    model_output_table<-data.frame(hr_int=NA,hr_intermediate_lr=NA,hr_intermediate_ur=NA,
-                                   hr_high=NA,hr_high_lr=NA,hr_high_ur=NA,AUC=NA,AUC_LR=NA,AUC_UR=NA)
-    for (i in 1:7){
-      model_output<-run_cox(model_type,data=train,full_adjustments,outcome,pgs_name=colnames(train)[start_column[i]])
-      
-      hr_ci<-round(summary(model_output)$conf.int[1:2,3:4],3)
-      c_index<-ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var))
-      model_output_table[i,]<-c(summary(model_output)$coefficient[1,2],hr_ci[1,1],
-                                hr_ci[1,2],summary(model_output)$coefficient[2,2],hr_ci[2,1],hr_ci[2,2],
-                                c_index[1],c_index[2],c_index[3])
-      rownames(model_output_table)[i]<-colnames(train)[start_column[i]]
-    }
-    
-    model_output_table
-    
-  }
-  
-  
-}
-
-
-
-model_to_table_cox<-function(model_output_table){
-  colength<-ncol(model_output_table)#7,10
-  
-  if(colength==6){
-    model_output_table[,7]<-paste(round(model_output_table[,1],3),"(",round(model_output_table[,2],3),"-",round(model_output_table[,3],3),")",sep="")
-    model_output_table[,8]<-paste(round(model_output_table[,4],3),"(",round(model_output_table[,5],3),"-",round(model_output_table[,6],3),")",sep="")
-    model_output_table_t<-data.frame(t(model_output_table))
-    model_output_table_t<-model_output_table_t[c(7,8),]
-    rownames(model_output_table_t)[1:2]<-c("HR per SD","Concordance index")
-    model_output_table_t<-cbind(rownames(model_output_table_t),model_output_table_t)
-    colnames(model_output_table_t)[1]<-NA
-  }else if (colength==9){
-    model_output_table[,10]<-paste(round(model_output_table[,1],3),"(",model_output_table[,2],"-",model_output_table[,3],")",sep="")
-    model_output_table[,11]<-paste(round(model_output_table[,4],3),"(",model_output_table[,5],"-",model_output_table[,6],")",sep="")
-    model_output_table[,12]<-paste(round(model_output_table[,7],3),"(",round(model_output_table[,8],3),"-",round(model_output_table[,9],3),")",sep="")
-    model_output_table_t<-data.frame(t(model_output_table))
-    model_output_table_t<-model_output_table_t[c(10:12),]
-    colnames(model_output_table_t)<-sub("_cat","",colnames(model_output_table_t))
-    rownames(model_output_table_t)[1:3]<-c("HR (intermediate vs Low)","HR (high vs Low)","Concordance index")
-    model_output_table_t<-cbind(rownames(model_output_table_t),model_output_table_t)
-    colnames(model_output_table_t)[1]<-NA
-  }
-  model_output_table_t
-}
-
-
-
-
 
 
 
@@ -756,8 +636,33 @@ output_table_summary_cox<-function(outcome,data,full_adjustments,trainsplit=F,tr
 
 
 
-
-
+tm1<-function(size){forest_theme(base_size = size,
+                                base_family = 1,
+                                # Confidence interval point shape, line type/color/width
+                                ci_pch = 20,
+                                ci_col = "black",
+                                ci_fill = "black",
+                                ci_alpha = 0.8,
+                                ci_lty = 1,
+                                ci_lwd = 1.5,
+                                ci_Theight = 0.2, # Set an T end at the end of CI 
+                                # Reference line width/type/color
+                                refline_lwd = 1,
+                                refline_lty = "dashed",
+                                refline_col = "grey20",
+                                # Vertical line width/type/color
+                                vertline_lwd = 1,
+                                vertline_lty = "dashed",
+                                vertline_col = "grey20",
+                                # Change summary color for filling and borders
+                                summary_fill = "white",
+                                summary_col = "white",
+                                # Footnote font size/face/color
+                                footnote_cex = 0.8,
+                                footnote_fontface = "italic",
+                                footnote_col = "black",
+                                core=list(fg_params=list(hjust = 1, x = 0.9),
+                                          bg_params=list(fill = c("white"))))}
 
 
 
