@@ -1,0 +1,15 @@
+*.docx
+*.rds
+*.csv
+*.xlsx
+*.out
+data/*
+graphs/*
+env_prs/*
+results/*
+PRS_calculated/*
+archive/*
+check_trial_error/*
+*.nextflow/*
+*.nextflow.*
+
