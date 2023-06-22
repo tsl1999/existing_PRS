@@ -205,7 +205,9 @@ data_prs<-table1_data
 
 
 for (i in 1:7){
-  quintile<-ntile(table1_data[,34+i],5)
+  quintile_cutoff<-quantile(data[,34+i],probs=seq(0,1,0.2),na.rm=F)
+ 
+  quintile<-cut(data[,34+i], breaks=quintile_cutoff,labels = c(1:5),include.lowest=TRUE)
   quintile<-factor(quintile,levels = c(1:5),labels = c("Q1","Q2","Q3","Q4","Q5"))
   data_prs[,paste(colnames(data_prs)[34+i],"_quintile",sep="")]<-quintile
 }
@@ -224,7 +226,7 @@ for (i in 1:7){
   list_quintile[i]<-list(pgs_quintile)
 }
 
-#saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
+saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
 ```
 
 

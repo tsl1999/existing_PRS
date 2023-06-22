@@ -98,11 +98,11 @@ EPA_cat<-EPA_prevalent[[2]]
 
 #self-creating function check------------------------
 run_glm(model_type = "simple",data=data,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPA",pgs_name = "PGS000018")
-glm(prevalent_CHD_EPA~PGS000018,data=data,family=binomial(link='logit'))
+glm(prevalent_CHD_EPA~custom_PGS000337,data=data,family=binomial(link='logit'))
 
 
 run_glm(model_type = "partial",data=data,full_adjustments = full_adjustments,outcome="prevalent_CHD_EPA",pgs_name = "PGS000018",partial_adjustment = c("AGE","SEX"))
-glm(prevalent_CHD_EPA~PGS000018+AGE+SEX+PC1+PC2+PC3+PC4+PC5+PC6+PC7,data=data,family=binomial(link='logit'))
+glm(prevalent_CHD_EPA~+AGE+SEX+PC1+PC2+PC3+PC4+PC5+PC6+PC7,data=data,family=binomial(link='logit'))
 
 
 

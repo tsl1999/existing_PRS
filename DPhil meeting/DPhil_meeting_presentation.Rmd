@@ -24,6 +24,7 @@ setwd(working_path)
 
 library(data.table)
 library(ggplot2)
+library(ggfortify)
 library(tidyr)
 library(dplyr)
 library(pROC)
@@ -32,27 +33,15 @@ library(caret)
 library(corrplot)
 library(DescTools)
 library(flextable)
+library(survival)
+library(survminer)
+library(dynpred)
+library(Epi)
+library(forestploter)
 source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
 source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
 ```
-```{r,include=FALSE}
-data<-readRDS(paste(data_path,"FullData_standardisedPRS_03May2023.rds",sep="/"))
 
-colnames(data)[33:39]<-sub("_standardised","",colnames(data)[33:39])#remove standardised after all PRS names to make column names shorter
-colnames(data)[39]<-"custom_Oni_Orisan"# change custom_Oni-Orisan to Oni_Orisan so that formula() can read it
-
-variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
-  variant_t<-data.frame(t(variants_included))
-  colnames(variant_t)<-variant_t[1,]
-  variant_t<-variant_t[2,]
-  variant_t<-cbind(rownames(variant_t),variant_t)
-  colnames(variant_t)[1]<-NA
-  colnames(variant_t)[8]<-"custom_Oni_Orisan"
-  variant_t[1,1]<-"Number of SNPs"
-
-data$SEX<-factor(data$SEX,levels = c("m","f"))
-data$diabetes_at_baseline<-factor(data$diabetes_at_baseline,levels = c(0,1))
-```
 
 ## Progress so far
 
@@ -73,21 +62,21 @@ data$diabetes_at_baseline<-factor(data$diabetes_at_baseline,levels = c(0,1))
 
 ### Distribution by case/control
 
-![distribution by case](/well/emberson/users/hma817/projects/existing_PRS/graphs/PRS_standardised_byCaseCtrl_EPA_25Apr2023.png)
+![distribution by case](/well/emberson/users/hma817/projects/existing_PRS/graphs/PRS_standardised_byCaseCtrl_EPA_31May2023.png)
 
 ### Distribution by sex
 
-![distribution by sex](/well/emberson/users/hma817/projects/existing_PRS/graphs/PRS_standardised_bysex_25Apr2023.png)
+![distribution by sex](/well/emberson/users/hma817/projects/existing_PRS/graphs/PRS_standardised_bysex_31May2023.png)
 
 ### Age distribution by case/control
 
-![ageby case](/well/emberson/users/hma817/projects/existing_PRS/graphs/Age_at_recruitment_byCaseCtrl_EPA_25Apr2023.png)
+![ageby case](/well/emberson/users/hma817/projects/existing_PRS/graphs/Age_at_recruitment_byCaseCtrl_EPA_31May2023.png)
 
 ### Age now by case/control
 
 Age now for participants is measured at 2022/05/01  (the mortality data retrieved data?)
 
-![age by case](/well/emberson/users/hma817/projects/existing_PRS/graphs/Age_now_byCaseCtrl_EPA_25Apr2023.png)
+![age by case](/well/emberson/users/hma817/projects/existing_PRS/graphs/Age_now_byCaseCtrl_EPA_31May2023.png)
 
 ## Correlation heatmap
 
@@ -103,358 +92,319 @@ Age now for participants is measured at 2022/05/01  (the mortality data retrieve
 
 
 
-```{r,echo=FALSE}
-prs_cor<-cor(data[,33:39],method = "pearson")
 
-corrplot(prs_cor, type = "lower", order = "original",method="number", 
-         tl.col = "black", tl.srt = 45)
-prs_cor<-data.frame(prs_cor)
-
-prs_cor$name<-rownames(prs_cor)
-prs_cor<-prs_cor[,c(8,1:7)]
-
-```
+![correlation heatmap](/well/emberson/users/hma817/projects/existing_PRS/graphs/correlation_heatmap.png)
 
 ## Baseline characteristics
 
 ```{r, include=FALSE}
-table1<-readRDS(paste(data_path,"/table1_09May2023.rds",sep=""))
+table1<-readRDS(paste(data_path,"/table1_31May2023.rds",sep=""))
 ```
 ```{r,echo=FALSE}
-flex_baseline<-my_table(table1, y=c(1:3,10,16,22,23,31))
-flex_baseline<-footnote(flex_baseline,i=36,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_baseline<-footnote(flex_baseline,i=23,j=1,part="body",ref_symbols="$",value = as_paragraph("Among participants with complete measurements, HDL_C and LDL_C have around 23% missingness."))
-flex_baseline<-footnote(flex_baseline,i=1,j=1,part="body",ref_symbols="§",value = as_paragraph("Participants age over 75 are excluded."))
+flex_baseline<-my_table(table1, y=c(1:3,10,16,22,23,38))
+flex_baseline <- add_header_row(flex_baseline, values =  c("Characteristic", "Gender"),
+    colwidths = c(1, 3), top = T)
+flex_baseline <- compose(flex_baseline, i = 28, j = 1, part = "body",
+    value = as_paragraph(
+      "\U{00A0}\U{00A0}BMI (kg/m",
+      as_sup("2"),")"    ) )
+flex_baseline<-add_footer_lines(flex_baseline,"Abbreviation \n SBP:systolic blood pressure, DBP: diastolic blood pressure, BMI: body mass index, NMR:nuclear magnetic resonance, HDL-C: high density lipoprotein cholesterol, LDL-C: low density lipoprotein cholesterol, HbA1c: hemoglobin A1c")
+flex_baseline<-footnote(flex_baseline,i=1,j=1,part="header",ref_symbols="*",value = as_paragraph("Table excludes individuals with age over 75, over one year of inconsistent age between death certificate and baseline or missing genetic data."))
 
-my_theme(flex_baseline,y=c(22,30,36))
+#flex_baseline<-footnote(flex_baseline,i=23,j=1,part="body",ref_symbols="$",value = as_paragraph("Among participants with complete measurements, HDL_C and LDL_C have around 23% missingness."))
+
+flex_baseline<-footnote(flex_baseline,i=42,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
+fpp <- fp_par(text.align = "left", padding = 3)
+flex_baseline<-set_caption(
+ flex_baseline,
+  caption = "Baseline Characteristics",align_with_table = FALSE,
+ word_stylename = "Table Caption",
+  fp_p = fpp
+)
+
+my_theme(flex_baseline,y=c(1:42))
 ```
 
-##Quintile tables
+## Quintile tables
 
 ### Quintile table (PGS000011)
 
 ```{r,include=FALSE}
-pgs_quintile<-readRDS(paste(data_path,"/PRS_quintile_tables_09May2023.rds",sep=""))
+pgs_quintile<-readRDS(paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
 ```
 
-```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[1]], y=c(2:10,12,15,21,28,34:38),x=1:7)
+```{r,include=FALSE}
+p<-NA
+pgsname<-colnames(data)[33:39]
+fpp <- fp_par(text.align = "left", padding = 3)
+for (i in 1:7){
+  flex_pgs<-my_table(pgs_quintile[[i]], y=c(2,3,4,6,8,10,12,14,16,19,22,28,35,41:45),x=1:7)
+  flex_pgs <- add_header_row(flex_pgs, values =  c("Characteristic", "Quintiles"," "),
+    colwidths = c(1, 5,1), top = T)
+  flex_pgs<-add_footer_lines(flex_pgs,"Abbreviation \n SBP:systolic blood pressure, DBP: diastolic blood pressure, BMI: body mass index, NMR:nuclear magnetic resonance, HDL-C: high density lipoprotein cholesterol, LDL-C: low density lipoprotein cholesterol, HbA1c: hemoglobin A1c")
+flex_pgs<-footnote(flex_pgs,i=2,j=1,part="header",ref_symbols="*",value = as_paragraph("Table excludes individuals with age over 75, over one year of inconsistent age between death certificate and baseline or missing genetic data."))
+flex_pgs<-footnote(flex_pgs,i=45,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
+flex_pgs<-footnote(flex_pgs,i=2,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 2 decimal places."))
+flex_pgs<-set_caption(
+ flex_pgs,
+  caption = paste(pgsname[i], "table"),align_with_table = FALSE,
+ word_stylename = "Table Caption",
+  fp_p = fpp
+)
+flex_pgs<-padding(flex_pgs,padding = 0, part = "all")
+flex_pgs<-line_spacing(flex_pgs,space =0.8, part = "all")
+p[i]<-list(my_theme(flex_pgs,y=c(1:44),z=1:6,fontsize = 6.8))
 
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+}
 ```
+
+```{r}
+p[[1]]
+```
+
 
 ### Quintile table (PGS000013) 
 
 ```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[2]], y=c(2:10,12,15,21,28,34:38),x=1:7)
-
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+p[[2]]
 ```
 
 ### Quintile table (PGS000018)
 
 ```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[3]], y=c(2:10,12,15,21,28,34:38),x=1:7)
-
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+p[[3]]
 ```
 
 ### Quintile table (PGS001780)
 
 ```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[4]], y=c(2:10,12,15,21,28,34:38),x=1:7)
-
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+p[[4]]
 ```
 
 ### Quintile table (PGS003446)
 
 ```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[5]], y=c(2:10,12,15,21,28,34:38),x=1:7)
-
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+p[[5]]
 ```
 
 ### Quintile table (PGS000337)
 
 ```{r,echo=FALSE}
-
-flex_pgs<-my_table(pgs_quintile[[6]], y=c(2:10,12,15,21,28,34:38),x=1:7)
-
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
+p[[6]]
 ```
 
 ### Quintile table (Oni-Orisan et al)
 
 ```{r,echo=FALSE}
-flex_pgs<-my_table(pgs_quintile[[7]], y=c(2:10,12,15,21,28,34:38),x=1:7)
+p[[7]]
 
-flex_pgs<-footnote(flex_pgs,i=38,j=1,part="body",ref_symbols="*",value = as_paragraph("Other diseases include emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
-flex_pgs<-footnote(flex_pgs,i=1,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 5 decimal places."))
-my_theme(flex_pgs,y=c(10,38),z=1:6)
 ```
 
 ## Primary analysis 
 
-### without PRS
+### EPO
 
-```{r}
+```{r,echo=FALSE}
+EPO_without_PRS<-readRDS(paste(data_path,"/Prevalent_CHD_EPO_withoutPRS.rds",sep=""))
+print(EPO_without_PRS)
+```
+
+#### continuous PRS
+
+
+```{r, include=FALSE}
+prevalent_EPO_cont<-readRDS(paste(data_path,"/Prevalent_CHD_EPO_cont_logistic_06Jun2023.rds",sep=""))
+```
+
+
+```{r,echo=FALSE}
+prev_cont_flextable(prevalent_EPO_cont)
+
+```
+
+
+#### forest table
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotEPO_cont_.png)
+
+
+
+#### PRS in deciles
+
+
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_Prevalent_CHD_EPO_Partial.png)
+
+### EPA
+
+```{r,echo=FALSE}
 EPA_without_PRS<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_withoutPRS.rds",sep=""))
 print(EPA_without_PRS)
 ```
 
-### continuous PRS
-
-
 ```{r, include=FALSE}
-prs_table_EPA<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_model_outcomes_09May_2023.rds",sep=""))
+prevalent_EPA_cont<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_cont_logistic_06Jun2023.rds",sep=""))
 ```
 
 
 ```{r,echo=FALSE}
-prs_table_EPA_cont<-prs_table_EPA[[1]]
-prs_table_EPA_cat<-prs_table_EPA[[2]]
+prev_cont_flextable(prevalent_EPA_cont)
 
 ```
 
-```{r}
-flex_cont<-my_table(prs_table_EPA_cont,y=c(1,2,7,12),x=1:8)
-flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
-my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
-```
+#### forest table
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotEPA_cont.png)
+
+#### PRS in deciles
 
 
 
-#### AUC plots
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_Prevalent_CHD_EPA_Partial.png)
 
-Simple
 
-![simple model with continuous PRS](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_cont.jpg)
-Partial
+## CAD mortality
 
-![Partia PRS](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_cont.jpg)
-Full
+### Linearity check martingale residual
 
-![Full mode](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_cont.jpg)
+1. Waist-to-hip ratio
 
-### Categorical PRS
+![](/well/emberson/users/hma817/projects/existing_PRS/graphs/Martingale_residual_WHRATIO.png)
+
+2.Systolic blood pressure
+
+![](/well/emberson/users/hma817/projects/existing_PRS/graphs/Martingale_residual_SBP.png)
+
+
+3.Diastolic blood pressure
+
+![](/well/emberson/users/hma817/projects/existing_PRS/graphs/Martingale_residual_DBP.png)
+
+
+
+### EPO001
+#### Forest plot
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/cox/cox_forestplotEPO001_cont.png)
 
 ```{r,echo=FALSE}
+EPO001_cont<-readRDS(paste(data_path,"/EPO001_cont_model_outcomes_05Jun2023.rds",sep=""))
+flex_cont<-my_table(EPO001_cont,y=c(1:3,6),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(3,6),j=1,part="body",value = as_paragraph(c("Partial adjusted models adjust for Sex and age groups. Fully adjusted models additionally adjust for  waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
+flex_cont <- add_header_row(flex_cont, values =  c(" ", "European PRS","Non-European PRS"),
+    colwidths = c(1, 4,3), top = T)
 
-flex_cat<-my_table(prs_table_EPA_cat,y=c(1,2,8,14),x=1:8)
-flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
-flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
 
-my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
+
+my_theme(flex_cont,y=c(1,2,5,8),set_padding = 3,fontsize = 8,header_border = 7)
+```
+#### PRS in deciles
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/cox/FAR_ggplot_EPO001_Partial.png)
+
+### EPA001
+#### Forest plot
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/cox/cox_forestplotEPA001_cont.png)
+
+```{r,echo=FALSE}
+EPO001_cont<-readRDS(paste(data_path,"/EPA001_cont_model_outcomes_05Jun2023.rds",sep=""))
+flex_cont<-my_table(EPO001_cont,y=c(1:3,6),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(3,6),j=1,part="body",value = as_paragraph(c("Partial adjusted models adjust for Sex and age groups. Fully adjusted models additionally adjust for  waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
+flex_cont <- add_header_row(flex_cont, values =  c(" ", "European PRS","Non-European PRS"),
+    colwidths = c(1, 4,3), top = T)
+
+
+
+my_theme(flex_cont,y=c(1,2,5,8),set_padding = 3,fontsize = 8,header_border = 7)
+```
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/cox/FAR_ggplot_EPA001_Partial.png)
+
+## Baseline CAD only
+
+```{r,echo=FALSE}
+BASE_without_PRS<-readRDS(paste(data_path,"/BASE_CHD_withoutPRS.rds",sep=""))
+print(BASE_without_PRS)
 ```
 
 
-#### AUC plots
+```{r,echo=FALSE}
+prevalent_base_cont<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_cont_logistic_15Jun2023.rds",sep=""))
+prev_cont_flextable(prevalent_base_cont)
 
-Simple
-
-![simple model with categorical PRS](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_cat.jpg)
-Partial
-
-![partial model with categorical PRS](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_cat.jpg)
-Full
-
-![full model with categorical PRS](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_cat.jpg)
-
-## Secondary analysis
-1. mortality
-2. stratified for sex
-
-## CAD Mortality
-- 4276 cases
-
-KM plot and log-rank test
-
-### KM -sex
-
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_Gender.jpg)
-
-### KM-smoking status
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_Smoking status.jpg)
-
-### KM-Baseline Diabetes
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_Baseline diabetes.jpg)
-
-
-### KM-Education level
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_Education level.jpg)
-
-### KM-PRS (categorical)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_PGS000011_cat.jpg)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_PGS000013_cat.jpg)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_PGS000018_cat.jpg)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_PGS001780_cat.jpg)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_custom_PGS000337_cat.jpg)
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/KM_plot_custom_Oni_Orisan_cat.jpg)
-
-
-
-## Stratified by sex 
-- 3118 / 84617 cases and controls among females 
-- 2630 / 39395 cases among males 
-- Higher proportion of CAD cases among males
-
-```{r,include=FALSE}
-prs_table_EPA_female<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_model_outcomesF_09May_2023.rds",sep=""))
-prs_table_EPA_cont_female<-prs_table_EPA_female[[1]]
-prs_table_EPA_cat_female<-prs_table_EPA_female[[2]]
 ```
 
-```{r,include=FALSE}
-prs_table_EPA_male<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_model_outcomesM_09May_2023.rds",sep=""))
-prs_table_EPA_cont_male<-prs_table_EPA_male[[1]]
-prs_table_EPA_cat_male<-prs_table_EPA_male[[2]]
+### forest plot
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotbaseCHD_cont.png)
+
+### PRS in deciles
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_BASE_CHD_Partial.png)
+
+## Age over 75 EPA
+
+```{r,echo=FALSE}
+CHD_without_PRS75<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_withoutPRS75.rds",sep=""))
+print(CHD_without_PRS75)
 ```
 
-### continuous PRS 
+
+```{r,echo=FALSE}
+prevalent_cont_75<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_cont75_logistic_15Jun2023.rds",sep=""))
+prev_cont_flextable(prevalent_cont_75)
+```
+### Forest plot
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotbaseCHD_cont75.png)
+
+### PRS in quintiles
+
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_Prevalent_CHD_EPA75_Partial.png)
+
+
+## Stratified for sex
+
+### EPA
 #### Female
+
 ```{r,echo=FALSE}
 model_withoutPRS_EPA_female<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_withoutPRSF.rds",sep=""))
 print(model_withoutPRS_EPA_female)
 ```
 
+ 
 ```{r,echo=FALSE}
-flex_cont<-my_table(prs_table_EPA_cont_female,y=c(1,2,7,12),x=1:8)
-flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
-my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+prevalent_cont_F<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_contF_logistic_13Jun2023.rds",sep=""))
+prev_cont_flextable(prevalent_cont_F)
 ```
-
-#### Male
 ```{r,echo=FALSE}
 model_withoutPRS_EPA_male<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_withoutPRSM.rds",sep=""))
 print(model_withoutPRS_EPA_male)
 ```
 
+
+#### Male 
+
 ```{r,echo=FALSE}
-flex_cont<-my_table(prs_table_EPA_cont_male,y=c(1,2,7,12),x=1:8)
-flex_cont<-footnote(flex_cont,i=c(2,7,12),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
-my_theme(flex_cont,y=c(1,6,11,16),z=1:8)
+prevalent_cont_M<-readRDS(paste(data_path,"/Prevalent_CHD_EPA_contM_logistic_13Jun2023.rds",sep=""))
+prev_cont_flextable(prevalent_cont_M)
 ```
-#### AUC plots
 
-Simple model AUC female
 
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_contF.jpg)
-
-Simple model AUC male
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_contM.jpg)
-Partial model AUC female
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_contF.jpg)
-
-Partial model AUC male
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_contM.jpg)
-Full model AUC female
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_contF.jpg)
-
-Full model AUC male
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_contM.jpg)
-
-### categorical PRS
-
+### forest plot
 #### Female
-```{r}
-flex_cat<-my_table(prs_table_EPA_cat_female,y=c(1,2,8,14),x=1:8)
-flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
-flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
 
-my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
-```
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotEPA_contf.png)
 
 #### Male
-```{r,echo=FALSE}
-flex_cat<-my_table(prs_table_EPA_cat_male,y=c(1,2,8,14),x=1:8)
-flex_cat<-footnote(flex_cat,i=1,j=2:8,part="header",value = as_paragraph(c("PRSs are divided in to 5 quintiles, Low PRS=Q1, Intermediate PRS=Q2-4, High PRS=Q5")),ref_symbols = c("+"))
-flex_cat<-footnote(flex_cat,i=c(2,8,14),j=1,part="body",value = as_paragraph(c("No adjustments","Adjust for Age at baseline, Sex and 7 genetic PCs","Partial model adjustments + waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*","$","§"))
 
-my_theme(flex_cat,y=c(1,7,13,19),z=1:8)
-```
-#### AUC plots
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/Logistic_forestplotEPA_contm.png)
 
-Simple model AUC female
+### PRS decile
+ 
+#### Female
 
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_catF.jpg)
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_Prevalent_CHD_EPA_F_Partial.png)
 
-Simple model AUC female
+#### Male
 
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_catM.jpg)
-
-Partial model AUC female
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_catF.jpg)
-
-Partial model AUC male
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_partial_prevalent_CHD_EPA_catM.jpg)
-
-
-
-Full model AUC female
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_catF.jpg)
-Full model AUC male
-
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_full_prevalent_CHD_EPA_catM.jpg)
-
-
-Simple model AUC
-![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/AUCplot_simple_prevalent_CHD_EPA_contM.jpg)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+![ ](/well/emberson/users/hma817/projects/existing_PRS/graphs/logistic/FAR_ggplot_Prevalent_CHD_EPA_M_Partial.png)

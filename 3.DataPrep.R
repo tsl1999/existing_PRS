@@ -60,6 +60,7 @@ table(data$prevalent_CHD_EPO)#7222   6834
 
 
 data$AGE_75<-ifelse(data$AGE>=75,NA,data$AGE)
+data$AGE_75_over<-ifelse(data$AGE>=75,data$AGE,NA)
 sum(is.na(data$AGE_75))
 data$date_since_recruitment<-as.Date("2020-12-31","%Y-%m-%d")-as.Date(data$DATE_RECRUITED,"%d%b%Y")
 data$yr_since_recruitment<-as.numeric(data$date_since_recruitment)/365.25
@@ -98,19 +99,30 @@ data$anti_diabetic_medication<-factor(data$anti_diabetic_medication,levels=c(0,1
 #write.csv(age_discrp,"age_discrep.csv") 
 
 #--------------------------------------------------------------
+
+
+
+data$diabetic_lab<-ifelse(is.na(data$BASE_HBA1C)==F&data$BASE_HBA1C>=6.5,1,0)
+
+data$diabetes_at_baseline<-ifelse(data$BASE_DIABETES==1|data$diabetic_lab==1|data$anti_diabetic_medication==1,1,0)
+data$diabetic_lab<-factor(data$diabetic_lab,levels = c(0,1))
+
+data$smokegp<-factor(data$smokegp,levels=c(1:5))
 data_keep<-data[is.na(data$AGE_75)==F,]
-
-data_keep$diabetic_lab<-ifelse(is.na(data_keep$BASE_HBA1C)==F&data_keep$BASE_HBA1C>=6.5,1,0)
-
-data_keep$diabetes_at_baseline<-ifelse(data_keep$BASE_DIABETES==1|data_keep$diabetic_lab==1|data_keep$anti_diabetic_medication==1,1,0)
-data_keep$diabetic_lab<-factor(data_keep$diabetic_lab,levels = c(0,1))
-
-data_keep$smokegp<-factor(data_keep$smokegp,levels=c(1:5))
 
 data_keep_further<-data_keep%>%select(IID,SEX,AGE,AGE_followup,BMI,BASE_CHD,BASE_CVD,BASE_DIABETES,BASE_HBA1C,
                                    smokegp,EDU_UNI,EDU_LEVEL,COYOACAN,WHRATIO,anti_diabetic_medication,SBP,DBP,
                                    HDL_C,LDL_C,prevalent_CHD_EPO,prevalent_CHD_EPA,EPO001,EPA001,contains(c("PC","PGS","custom")),
                                    diabetic_lab,diabetes_at_baseline,DATE_OF_DEATH,DATE_RECRUITED)
+
+
+data_keep_75<-data[is.na(data$AGE_75_over)==F,]
+
+data_keep_further_75<-data_keep_75%>%select(IID,SEX,AGE,AGE_followup,BMI,BASE_CHD,BASE_CVD,BASE_DIABETES,BASE_HBA1C,
+                                      smokegp,EDU_UNI,EDU_LEVEL,COYOACAN,WHRATIO,anti_diabetic_medication,SBP,DBP,
+                                      HDL_C,LDL_C,prevalent_CHD_EPO,prevalent_CHD_EPA,EPO001,EPA001,contains(c("PC","PGS","custom")),
+                                      diabetic_lab,diabetes_at_baseline,DATE_OF_DEATH,DATE_RECRUITED)
+
 
 
 
@@ -142,6 +154,7 @@ ggplot(data = dt_melt_standardised, aes(x=value)) + geom_density( alpha = 0.4,fi
 #check difference between PRS for case and control-------------------------
 
 prs_standardised<-merge(data_keep_further[,c(1:23,25:31,39,40:42)],prs[,c(1,9:15)],by="IID")
+prs_standardised_75<-merge(data_keep_further_75[,c(1:23,25:31,39,40:42)],prs[,c(1,9:15)],by="IID")
 
 data_table_1_standardised<-merge(data_table_1[,1:34],prs[,c(1,9:15)],by="IID")
 dt_melt_standardised<-melt(prs_standardised%>%select(IID,SEX,prevalent_CHD_EPA,prevalent_CHD_EPO,contains(c("PGS","custom"))),c("IID","SEX","prevalent_CHD_EPA","prevalent_CHD_EPO"))
@@ -188,3 +201,17 @@ ggplot(data = data_keep, aes(x=AGE_followup)) + xlab("Age at risk")+
 #saveRDS(prs,paste(data_path,"PRS_standardised_31Apr2023.rds",sep="/"))
 #saveRDS(prs_standardised,paste(data_path,"FullData_standardisedPRS_31May2023.rds",sep="/"))
 #saveRDS(data_table_1_standardised,paste(data_path,"Table1_data_standardisedPRS_31May2023.rds",sep="/"))
+#saveRDS(prs_standardised_75,paste(data_path,"FullData_standardisedPRS_75_16Jun2023.rds",sep="/"))
+
+
+data_ancestry<-data.frame(fread(paste(data_path,"/ancestry_gen.csv",sep="")))
+data<-readRDS(paste(data_path,"/analysis_data_31May2023.rds",sep="/"))
+
+data_restricted_IID<-data.frame(fread("/well/emberson/users/bjk420/projects/popgen_v2/07_pca/mcps_only/no_references/king/ivs_unrelated-set_oxford.txt", header=F))
+
+colnames(data_ancestry)[1]<-"IID"
+data_ancestry_merge<-merge(data,data_ancestry,by="IID")
+
+data_restricted<-data[data$IID%in%data_restricted_IID$V2,]
+saveRDS(data_ancestry_merge,paste(data_path,"/FullData_ancestry_22Jun2023.rds",sep=""))
+saveRDS(data_restricted,paste(data_path,"/RestrictedData_22Jun2023.rds",sep=""))

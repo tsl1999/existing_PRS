@@ -12,4 +12,8 @@ archive/*
 check_trial_error/*
 *.nextflow/*
 *.nextflow.*
+nextflow
+dx-toolkit*
+dx-toolkit/*
+DPhil meeting/*
 

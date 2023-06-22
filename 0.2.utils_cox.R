@@ -135,19 +135,3 @@ p<-ggcoxfunctional(model, data = data_in, point.col = "blue", point.alpha = 0.5,
 print(p)
 dev.off()}
 
-
-library(grid)
-tm2 <- forest_theme(base_size = 5,
-                    core = list(bg_params=list(fill = c("white"))),
-                    ci_pch = c(15, 16),
-                    ci_col = c("black", "navy"),
-                    footnote_col = "black",
-                    footnote_cex = 0.9,
-                    legend_name = "Model type",
-                    legend_value = c("Partial", "Full"),
-                    vertline_lwd = 1,
-                    vertline_lty = "dashed",
-                    vertline_col = "grey20",xaxis_cex=0.9,
-                    ci_lty =1 ,
-                    ci_lwd = 0.5,
-                    ci_Theight = 0.1,)

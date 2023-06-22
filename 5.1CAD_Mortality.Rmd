@@ -34,34 +34,28 @@ library(survival)
 library(survminer)
 library(dynpred)
 library(Epi)
+library(forestploter)
 
 ```
 
 ##data
 ```{r,include=FALSE}
 data<-readRDS(paste(data_path,"FullData_timesplit_31May2023.rds",sep="/"))
+data<-data[,-c(45:51)]
 data2<-readRDS(paste(data_path,"FullData_standardisedPRS_mortality_31May2023.rds",sep="/"))
 
-variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
-  variant_t<-data.frame(t(variants_included))
-  colnames(variant_t)<-variant_t[1,]
-  variant_t<-variant_t[2,]
-  variant_t<-cbind(rownames(variant_t),variant_t)
-  colnames(variant_t)[1]<-NA
-  colnames(variant_t)[8]<-"custom_Oni_Orisan"
-  variant_t[1,1]<-"Number of SNPs"
-variant_t[2:8]<-prettyNum(variant_t[2:8], big.mark = ",", scientific = FALSE)
- PCs<-c(paste0("PC",1:7)) 
+
+model_table_top<-readRDS(paste(data_path,"/model_table_top.rds",sep=""))
  data$agegroup<-factor(data$agegroup,levels = c(1:5))
  source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
-source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.2.utils_cox.R")
+source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")
 ```
 
 
 
 
 
-```{r,echo=FALSE}
+```{r,include=FALSE}
 #check km plot of normal data and lexis expansion data
 autoplot(survfit(Surv(time=time_in,time2 = time_out,EPO001_up_75)~1,data=data),data=data,risk.table = T)
 autoplot(survfit(Surv(followup,data2$EPO001_up&data2$AGE_followup<75)~1,data=data2),data=data2,risk.table = T)
@@ -121,35 +115,35 @@ summary(fit2)
 
 #adjust for age-bands
 
-```{r,echo=FALSE}
-model_no_prs<-coxph(Surv(time_in,time_out,EPO001_up_75,type = "counting")~SEX+as.factor(agegroup)+EDU_LEVEL+as.factor(diabetes_at_baseline)+smokegp+ SBP + 
+```{r,include=FALSE}
+model_no_prs_partial<-coxph(Surv(time_in,time_out,EPO001_up_75,type = "counting")~SEX+as.factor(agegroup),data=data)
+ c_index_partial<-round(ci_manual(x=concordance(model_no_prs_partial)$concordance,se=sqrt(concordance(model_no_prs_partial)$var)),3)
+model_no_prs_full<-coxph(Surv(time_in,time_out,EPO001_up_75,type = "counting")~SEX+as.factor(agegroup)+EDU_LEVEL+as.factor(diabetes_at_baseline)+smokegp+ SBP + 
     DBP + WHRATIO,data=data)
+ c_index_full<-round(ci_manual(x=concordance(model_no_prs_full)$concordance,se=sqrt(concordance(model_no_prs_full)$var)),3)
+
 
 ```
+
+
+```{r,echo=FALSE}
+
+model_withoutPRS_EPO001<-data.frame(partial_cindex=paste(c_index_partial[1],"(",c_index_partial[2],"-",c_index_partial[3],")"),full_cindex=paste(c_index_full[1],"(",c_index_full[2],"-",c_index_full[3],")"))
+print(model_withoutPRS_EPO001)
+#saveRDS(model_withoutPRS_EPO001,paste(data_path,"/EPO001_withoutPRS.rds",sep=""))
+```
+
 
 
 ```{r,echo=FALSE}
 #summary(model_no_prs)
-cox.zph(model_no_prs)
+cox.zph(model_no_prs_partial)
+cox.zph(model_no_prs_full)
 
-round(ci_manual(x=concordance(model_no_prs)$concordance,se=sqrt(concordance(model_no_prs)$var)),3)
 ```
 
 
-### CAD mortality as EPA001
-```{r,include=FALSE}
-#plot km plot for catgorical prs
-#start_column=which( colnames(final_data)%in%paste(colnames(variant_t),"_cat",sep=""))
-#for (i in 1:7){
-  
-#  p<-ggsurvplot(survfit(create_surv_formula(model_type="simple",data=final_data,full_adjustments,outcome="EPA001_up",pgs_name=colnames(final_data)[start_column[i]]), data = final_data),pval = T,risk.table = T)
-#  jpeg(paste(graphs_path,"/KM_plot_",colnames(final_data)[start_column[i]],".jpg",sep=""),width = 1000,height = 800)
-#  print(p)
-  
-#  dev.off()
-#}
-```
-
+### CAD mortality as EPO001
 
 ```{r,include=FALSE}
 numeric_variable<-c("SBP","DBP","WHRATIO")
@@ -159,206 +153,102 @@ for(i in 1:length(numeric_variable)){
 }
 
 for (i in 1:7){
- plot_martingale(colnames(variant_t)[i+1],outcome="EPO001_up_75",include = "linear",save=paste("/cox/",colnames(variant_t)[i+1],sep=""))
+ plot_martingale(colnames(model_table_top)[i+1],outcome="EPO001_up_75",include = "linear",save=paste("/cox/",colnames(model_table_top)[i+1],sep=""))
 }
 ```
 
 
 
 ```{r,include=FALSE}
-outcome="EPA001_up_75"
+outcome="EPO001_up_75"
 partial_adjustments=c("SEX","agegroup")
 full_adjustments = c(partial_adjustments,c("WHRATIO","SBP","DBP","EDU_LEVEL","smokegp","diabetes_at_baseline"))
 ```
 
 ```{r,include=FALSE}
-model_output_simple<-create_output_table_cox(data=data,adjustments=partial_adjustments,outcome=outcome,trainsplit = F)
-```
+model_output_partial<-create_output_table_cox(data=data,adjustments=partial_adjustments,outcome=outcome,trainsplit = F)
 
-```{r,include=FALSE}
 model_output_full<-create_output_table_cox(data=data,adjustments=full_adjustments,outcome=outcome,trainsplit = F,namew = "_full")
 ```
 
 ```{r,include=FALSE}
 
-model_output_partial_t<-model_to_table_cox(model_output_simple)
-  model_output_full_t<-model_to_table_cox(model_output_full)
- EPO001_cont<-rbind(variant_t,
-                        c("Partially adjusted Model", rep(NA,7)),
-                        model_output_partial_t,
-                        
-                        c("Fully Adjusted Model", rep(NA,7)),
-                        model_output_full_t
-  )
- rownames(EPO001_cont)<-seq(1:nrow(EPO001_cont))
-  colnames(EPO001_cont)[1]<-"95% CI"
-  EPO001_cont$`95% CI`[c(3,4,6,7)]<-paste("\U{00A0}\U{00A0}",EPO001_cont$`95% CI`[c(3,4,6,7)],sep="")
-  #saveRDS(EPO001_cont,paste(data_path,"/EPO001_cont_model_outcomes_31May2023.rds",sep=""))
+EPO001_cont<-combine_model_tables(tables=list(model_output_partial,model_output_full),name = c("Partially adjusted","Fully adjusted"),log_cox = "cox")
+
+
+#saveRDS(EPO001_cont,paste(data_path,"/EPO001_cont_model_outcomes_05Jun2023.rds",sep=""))
 ```
 
 ### HR table
 
 ```{r,echo=TRUE}
-flex_cont<-my_table(EPO001_cont,y=c(1,2,5),x=1:8)
-flex_cont<-footnote(flex_cont,i=c(2,5),j=1,part="body",value = as_paragraph(c("Partial adjusted models adjust for Sex and age groups. Fully adjusted models additionally adjust for  waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
-flex_cont <- add_header_row(flex_cont, values =  c(" ", "Polygenic risk scores"),
-    colwidths = c(1, 7), top = T)
+flex_cont<-my_table(EPO001_cont,y=c(1:3,6),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(3,6),j=1,part="body",value = as_paragraph(c("Partial adjusted models adjust for Sex and age groups. Fully adjusted models additionally adjust for  waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
+flex_cont <- add_header_row(flex_cont, values =  c(" ", "European PRS","Non-European PRS"),
+    colwidths = c(1, 4,3), top = T)
 
 
 
-my_theme(flex_cont,y=c(1,4,7),set_padding = 3,fontsize = 12)
+my_theme(flex_cont,y=c(1,2,5,8),set_padding = 3,fontsize = 8,header_border = 7)
 ```
 
 ##plot forest plot
 ```{r,include=FALSE}
-model_output_full_up<-model_output_full
-colnames(model_output_full_up)[1:9]<-paste(colnames(model_output_full)[1:9],"_full",sep="")
-model_output<-merge(model_output_simple,model_output_full_up,by="row.names")
-rownames(model_output)<-model_output$Row.names
-model_output<-model_output[,2:ncol(model_output)]
-model_output$pgsname<-rownames(model_output)
-
-model_output[,c(1:8,10:17)]<-apply(model_output[,c(1:8,10:17)],2,as.numeric)
-#model_output$'HR (95%CI)'<-paste(model_output$HR," (",model_output$LR,"-",model_output$UR,")")
-model_output$" "<- paste(rep(" ", 40), collapse = " ")
-forest_table<-model_output[,c("pgsname"," ","HR","LR","UR","pval","HR_full","LR_full","UR_full","pval_full","case_no","control_no","case_no_full","control_no_full")]
-forest_table<-forest_table[c(3:7,2:1),]
-
-
-
-```
-
-
-
-
-
-```{r,include=FALSE}
-forest_table$"HR per SD (95%CI)"<-paste(forest_table$HR,"(",forest_table$LR,"-",forest_table$UR,")",sep="")
-forest_table$"HR per SD (95%CI) "<-paste(forest_table$HR_full,"(",forest_table$LR_full,"-",forest_table$UR_full,")",sep="")
-colnames(forest_table)[c(1,6,10,11:14)]<-c("                                   ","p-value","p-value ","CAD cases","No CAD","CAD cases ","No CAD ")
-```
-
-#### type 1
-
-```{r,include=FALSE}
-p <- forest(forest_table[,c(1,11,12,15,13,14,16,2)],
-            est = list(forest_table$HR,forest_table$HR_full),
-            lower = list(forest_table$LR,forest_table$LR_full), 
-            upper = list(forest_table$UR,forest_table$UR_full),
-            ci_column = 8,
-            ref_line = 1,
-            arrow_lab = c("Lower risk of CAD", "Higher risk of CAD"),
-            xlim = c(0.9, 1.35),
-            ticks_at = c(0.9, 1, 1.1,1.2,1.3),
-            footnote = "\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and age group. Fully adjusted model additionally adjusts for education level, smoking status, blood pressure and waist-hip ratio ",
-            theme=tm2)
-
-
-p <- insert_text(p, text = "Simple model",
-              part = "header",
-              col = 2:4,
-              gp = gpar(fontface = "bold",fontsize=6))
-p <- add_text(p, text = "Full model",
-              part = "header",
-              col = 5:7,
-              row=1,
-              gp = gpar(fontface = "bold",fontsize=6))
-p <- add_border(p, 
-                part = "header", 
-                row = 2,
-                col = 1:8, gp = gpar(lwd = 1))
-p <- add_border(p, 
-                part = "header", 
-                row = 1,
-                col = 2:4,
-                gp = gpar(lwd = .5))
-p <- add_border(p, 
-                part = "header", 
-                row = 1,
-                col = 5:7,
-                gp = gpar(lwd = .5))
-
-p <- add_border(p, 
-                part = "body", 
-                col = 2:7,row=1:6,
-                gp = gpar(lwd = .5))
-p <- add_border(p, 
-                part = "body", 
-                row = 1:7,col=4,
-                gp = gpar(lwd = .5),where="right")
-
-
-
-p<- edit_plot(p, row = 1:7, col=1,
-               gp = gpar(fontface = "bold"))
-
+forest_table<-forest_table_EPO<-generate_forest_table(tables=list(model_output_partial,model_output_full),model_name = c("Partially adjusted","Fully adjusted"),or_hr = "HR",show_pgsname=T)
+p<-plot_forest(forest_table = forest_table,xlim=c(0.9,1.35),ticks_at = c(0.9,1,1.1,1.2,1.3),hr_or = "HR")
 a<-get_wh(p,unit = "cm")
-
-png(paste(graphs_path,"/cox/Cox_forestplot1_",outcome,".png",sep=""), res = 150, width = a[1], height = a[2], units = "cm")
+png(paste(graphs_path,"/cox/cox_forestplotEPO001_cont",".png",sep=""), res = 200, width = a[1], height = a[2], units = "cm")
 print(p)
 dev.off()
 ```
-#### type2
 
+
+
+```{r}
+
+knitr::include_graphics(paste(graphs_path,"/cox/cox_forestplotEPO001_cont",".png",sep=""))
+
+```
+## EPA001
 ```{r,include=FALSE}
-  hr_ci<-NA
-forest_table<-data.frame(subgroup=NA,case_no=NA,control_no=NA,OR=NA,LR=NA,UR=NA,hr_ci=NA,pval=NA)
-model_list<-list(model_output_simple,model_output_full)
-    name<-c("\U{00A0}\U{00A0}Partially adjusted","\U{00A0}\U{00A0}Fully adjusted")
-    for (i in 1:7){
-      forest_table<-rbind(forest_table,c(rownames(model_output_simple)[i],rep(" ",7)))
-      for (j in 1:2){
-        hr_ci<-paste(round(as.numeric(model_list[[j]][i,1]),3),"(",model_list[[j]][i,2],"-",model_list[[j]][i,3],")",sep="")
-        row_input<-unlist(c(name[j],model_list[[j]][i,c("case_no","control_no","HR","LR","UR")],
-                            hr_ci,model_list[[j]][i,c("pval")]))
-        forest_table<-rbind(forest_table,row_input,make.row.names=F)
-      }
-      
-    }
-    forest_table<-forest_table[2:nrow(forest_table),]
+outcome="EPA001_up_75"
+partial_adjustments=c("SEX","agegroup")
+full_adjustments = c(partial_adjustments,c("WHRATIO","SBP","DBP","EDU_LEVEL","smokegp","diabetes_at_baseline"))
+
+```
+```{r,include=FALSE}
+model_output_partial<-create_output_table_cox(data=data,adjustments=partial_adjustments,outcome=outcome,trainsplit = F)
+
+model_output_full<-create_output_table_cox(data=data,adjustments=full_adjustments,outcome=outcome,trainsplit = F,namew = "_full")
 ```
 
 
+```{r,echo=FALSE}
+EPA001_cont<-combine_model_tables(tables=list(model_output_partial,model_output_full),name = c("Partially adjusted","Fully adjusted"),log_cox = "cox")
 
-```{r,include=FALSE}
-forest_table$" "<- paste(rep(" ", 40), collapse = " ")
-colnames(forest_table)<-c("  ","CAD case", "No CAD", "HR","LR","UR","HR (95%CI)","p-value","   ")
+saveRDS(EPA001_cont,paste(data_path,"/EPA001_cont_model_outcomes_05Jun2023.rds",sep=""))
 
-p <- forest(forest_table[,c(1:3,7,9,8)],
-            est = as.numeric(forest_table$HR),
-            lower = as.numeric(forest_table$LR), 
-            upper = as.numeric(forest_table$UR),
-            ci_column = 5,
-            ref_line = 1,
-            arrow_lab = c("Lower risk of CAD", "Higher risk of CAD"),
-            xlim = c(0.9, 1.35),
-            ticks_at = c(0.9, 1, 1.1,1.2,1.3),
-            footnote = "\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and age group. Fully adjusted model additionally adjusts for education level, smoking status, \n blood pressure and waist-hip ratio ",
-            theme=tm2)
+flex_cont<-my_table(EPO001_cont,y=c(1:3,6),x=1:8)
+flex_cont<-footnote(flex_cont,i=c(3,6),j=1,part="body",value = as_paragraph(c("Partial adjusted models adjust for Sex and age groups. Fully adjusted models additionally adjust for  waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
+flex_cont <- add_header_row(flex_cont, values =  c(" ", "European PRS","Non-European PRS"),
+    colwidths = c(1, 4,3), top = T)
+
+
+
+my_theme(flex_cont,y=c(1,2,5),set_padding = 3,fontsize = 8,header_border = 7)
 
 ```
-
 ```{r,include=FALSE}
-
-p <- add_border(p, 
-                part = "header", 
-                row = 1,
-                col = 1:6, gp = gpar(lwd = 1))
-
-p <- add_border(p, 
-                part = "body", 
-                col = 2:4,row=1:20,
-                gp = gpar(lwd = .5))
-
-
-
-p<- edit_plot(p, row = c(seq(1,21,by=3)), col=1,
-               gp = gpar(fontface = "bold"))
-
+forest_table<-forest_table_EPO<-generate_forest_table(tables=list(model_output_partial,model_output_full),model_name = c("Partially adjusted","Fully adjusted"),or_hr = "HR",show_pgsname = T)
+p<-plot_forest(forest_table = forest_table,xlim=c(0.9,1.35),ticks_at = c(0.9,1,1.1,1.2,1.3),hr_or = "HR")
 a<-get_wh(p,unit = "cm")
-
-png(paste(graphs_path,"/cox/Cox_forestplot2_",outcome,".png",sep=""), res = 200, width = a[1], height = a[2], units = "cm")
+png(paste(graphs_path,"/cox/cox_forestplotEPA001_cont",".png",sep=""), res = 200, width = a[1], height = a[2], units = "cm")
 print(p)
 dev.off()
 ```
+
+```{r}
+knitr::include_graphics(paste(graphs_path,"/cox/cox_forestplotEPA001_cont",".png",sep=""))
+```
+
 
