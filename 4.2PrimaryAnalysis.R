@@ -1,0 +1,138 @@
+#call packages and data
+##package and self-create function
+rm(list=ls())
+#set working directory load package-----------------
+working_path<-'/well/emberson/users/hma817/projects/existing_PRS'
+data_path<-paste(working_path,'/data',sep='')
+graphs_path<-paste(working_path,'/graphs',sep='')
+setwd(working_path)
+source("/gpfs3/well/emberson/users/hma817/codes/R_TablesFunction_27Sep2022_TL.r")
+source("/gpfs3/well/emberson/users/hma817/projects/existing_PRS/0.1.utils.R")  
+
+#data---------------------
+data<-readRDS(paste(data_path,"FullData_standardisedPRS_31May2023.rds",sep="/"))
+PGS_id_name <- data.frame(read.csv(paste(data_path,"/PGS_id_name.csv",sep="")))
+colnames(PGS_id_name)[1]<-NA
+rownames(PGS_id_name)<-PGS_id_name$X
+for (i in 1:7){
+  PGS_id_name[2,i+1]<-as.character(as.Date(PGS_id_name[2,i+1],format="%d-%b-%y"))
+}
+
+
+data<-data[,c(1:32,35:41)]
+table1_data<-readRDS(paste(data_path,"Table1_data_standardisedPRS_31May2023.rds",sep="/"))
+colnames(data)[33:39]<-sub("_standardised","",colnames(data)[33:39])
+#remove standardised after all PRS names to make column names shorter
+colnames(data)[39]<-"custom_Oni_Orisan"# change custom_Oni-Orisan to Oni_Orisan so that formula() can read it
+
+variants_included<-readRDS(paste(data_path,"variants_included.rds",sep="/"))
+variant_t<-data.frame(t(variants_included))
+colnames(variant_t)<-variant_t[1,]
+variant_t<-variant_t[2,]
+variant_t<-cbind(rownames(variant_t),variant_t)
+colnames(variant_t)[1]<-NA
+colnames(variant_t)[8]<-"custom_Oni_Orisan"
+variant_t[1,1]<-"Number of SNPs"
+
+
+variant_t[2:8]<-prettyNum(variant_t[2:8], big.mark = ",", scientific = FALSE)
+model_table_top<-rbind(variant_t,PGS_id_name[c(2,1),])
+model_table_top[2,1]<-"Publication date"
+m_t<-t(model_table_top)
+colnames(m_t)<-m_t[1,]
+m_t<-m_t[-1,]
+m_t<-m_t[c(order(m_t[1:4,2]),order(m_t[5:7,2])+4),]
+model_table_top<-cbind(c("Number of SNPs","Publication date","PRS author/PGS ID/Ethnicity"),t(m_t))
+colnames(model_table_top)[1]<-NA
+#saveRDS(model_table_top,paste(data_path,"/model_table_top.rds",sep=""))
+
+
+data$EPA001_up<-ifelse(is.na(data$EPA001)==F&data$EPA001==1,1,0)
+data$EPA001_up<-as.numeric(data$EPA001_up)
+data$EPO001_up<-ifelse(is.na(data$EPO001)==F&data$EPO001==1,1,0)
+data$EPO001_up<-as.numeric(data$EPO001_up)
+#saveRDS(data,paste(data_path,"analysis_data_13Jun2023.rds",sep="/"))
+
+# EPA ---------
+## without prs -------
+# set adjustments first
+non_adjustment=NULL
+partial_adjustments=c("AGE","SEX")
+full_adjustments = c("AGE","SEX","WHRATIO","SBP","DBP","EDU_LEVEL","smokegp","diabetes_at_baseline")
+
+model_withoutPRS_EPA<-discrimination_without_prs(
+  train_data = data,test_data = data,outcome="prevalent_CHD_EPA",
+  partial_adjustments = partial_adjustments,full_adjustments = full_adjustments)
+print(model_withoutPRS_EPA)
+#saveRDS(model_withoutPRS_EPA,paste(data_path,"/Prevalent_CHD_EPA_withoutPRS.rds",sep=""))
+
+## with prs-------------------
+model_output_simple<-create_output_table(
+  trainsplit = F,data,adjustments=non_adjustment,outcome="prevalent_CHD_EPA",namew=NULL)
+
+model_output_partial<-create_output_table(
+  trainsplit = F,data,adjustments=partial_adjustments,outcome="prevalent_CHD_EPA",namew="partial")
+
+model_output_full<-create_output_table(
+  trainsplit = F,data,adjustments=full_adjustments,outcome="prevalent_CHD_EPA",namew="full")
+
+### results table -------------
+prevalent_EPA_cont<-combine_model_tables(
+  tables=list(model_output_partial,model_output_full),
+  name = c("Partially adjusted","Fully adjusted"),log_cox = "log")
+#saveRDS(prevalent_EPA_cont,paste(data_path,"/Prevalent_CHD_EPA_cont_logistic_06Jun2023.rds",sep=""))
+
+flex_table<-prev_cont_flextable(prevalent_EPA_cont,table_caption = "Association of PRSs with CAD (baseline CAD and CAD mortality anywhere mentioned on the death certificate)")
+saveRDS(flex_table,paste(data_path,"/Prevalent_CHD_EPA_cont_logistic_flex.rds",sep=""))
+
+### forest table -------------------
+forest_table<-generate_forest_table(
+  tables=list(model_output_partial,model_output_full),
+  model_name = c("Partially adjusted","Fully adjusted"),or_hr = "OR",show_pgsname = T)
+
+p<-plot_forest(forest_table = forest_table,xlim=c(0.9,1.3),ticks_at = c(0.9,1,1.1,1.2,1.3),hr_or = "OR")
+a<-get_wh(p,unit = "cm")+2
+
+png(paste(graphs_path,"/logistic/Logistic_forestplotEPA_cont",".png",sep=""), res = 200, width = a[1], height = a[2], units = "cm")
+print(p)
+dev.off()
+
+## EPO ---------------------
+
+## without prs -------
+model_withoutPRS_EPO<-discrimination_without_prs(
+  train_data = data,test_data = data,outcome="prevalent_CHD_EPO",
+  partial_adjustments = partial_adjustments,full_adjustments = full_adjustments)
+print(model_withoutPRS_EPO)
+#saveRDS(model_withoutPRS_EPA,paste(data_path,"/Prevalent_CHD_EPO_withoutPRS.rds",sep=""))
+
+## with prs -----------------
+model_output_simple<-create_output_table(
+  trainsplit = F,data,adjustments=non_adjustment,outcome="prevalent_CHD_EPO",namew=NULL)
+
+model_output_partial<-create_output_table(
+  trainsplit = F,data,adjustments=partial_adjustments,outcome="prevalent_CHD_EPO",namew="partial")
+
+model_output_full<-create_output_table(
+  trainsplit = F,data,adjustments=full_adjustments,outcome="prevalent_CHD_EPO",namew="full")
+
+### results table -----------------
+prevalent_EPO_cont<-combine_model_tables(
+  tables=list(model_output_partial,model_output_full),
+  name = c("Partially adjusted","Fully adjusted"),log_cox = "log")
+#saveRDS(prevalent_EPO_cont,paste(data_path,"/Prevalent_CHD_EPO_cont_logistic_06Jun2023.rds",sep=""))
+
+flex_table<-prev_cont_flextable(prevalent_EPO_cont,table_caption = "Association of PRSs with CAD (baseline CAD and CAD mortality as primary cause of death)")
+saveRDS(flex_table,paste(data_path,"/Prevalent_CHD_EPO_cont_logistic_flex.rds",sep=""))
+
+### forest table ----------------
+forest_table_EPO<-generate_forest_table(
+  tables=list(model_output_partial,model_output_full),
+  model_name = c("Partially adjusted","Fully adjusted"),or_hr = "OR",show_pgsname = T)
+
+p<-plot_forest(forest_table = forest_table_EPO,xlim=c(0.9,1.3),ticks_at = c(0.9,1,1.1,1.2,1.3),hr_or="HR")
+a<-get_wh(p,unit = "cm")+2
+
+png(paste(graphs_path,"/logistic/Logistic_forestplotEPO_cont_",".png",sep=""), res = 200, width = a[1], height = a[2], units = "cm")
+print(p)
+dev.off()

@@ -16,4 +16,6 @@ nextflow
 dx-toolkit*
 dx-toolkit/*
 DPhil meeting/*
-
+output/*
+work/*
+*.Rmd

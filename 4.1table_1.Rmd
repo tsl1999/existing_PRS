@@ -127,7 +127,7 @@ for (i in c(24:37,39:43)){
   baseline_up[i,1]<-paste('\U{00A0}\U{00A0}',gsub(",.*$", "",baseline_up[i,1]),sep="")
 }
 
-baseline_up[43,1]<-"\U{00A0}\U{00A0}Diabetes (HBA1C>6.5%, self-report or medication use)"
+baseline_up[42,1]<-"\U{00A0}\U{00A0}Diabetes (HBA1C>6.5%, self-report or medication use)"
 
 
 
@@ -159,14 +159,14 @@ flex_baseline<-set_caption(
   fp_p = fpp
 )
 
-my_theme(flex_baseline,y=c(1:42))
-
-
+flex_baseline<-my_theme(flex_baseline,y=c(1:42))
+saveRDS(flex_baseline,paste(data_path,"/table1_flex.rds",sep=""))
+flex_baseline
 ```
 
 
 
-```{r,include=FALSE}
+```{r,echo=FALSE}
 baseline_hidemissing<-create_table_1(data=table1_data,variables_to_select = variables_to_select,var_name = var_name,by="SEX",missing = F)
 baseline_up_no_missing<-rbind(baseline_hidemissing[c(2,3,12:28),],c("Biological Measures, Mean(SD)",rep(NA,3)),baseline_hidemissing[c(4:10),],c("Reoprted medical history, N(%)",rep(NA,3)),baseline_hidemissing[c(29:33),])
 rownames(baseline_up_no_missing)<-seq(1:nrow(baseline_up_no_missing))
@@ -177,7 +177,7 @@ for (i in c(21:27,29:33)){
 baseline_up_no_missing[32,1]<-"\U{00A0}\U{00A0}Diabetes (HBA1C>6.5%, self-report or medication use)"
 
 ```
-```{r,include=FALSE}
+```{r,echo=FALSE}
 flex_baseline<-my_table(baseline_up_no_missing, y=c(1:3,9,14,19,20,28))
 flex_baseline <- add_header_row(flex_baseline, values =  c("Characteristic", "Gender"),
     colwidths = c(1, 3), top = T)
@@ -192,10 +192,21 @@ flex_baseline<-footnote(flex_baseline,i=1,j=1,part="header",ref_symbols="*",valu
 
 flex_baseline<-footnote(flex_baseline,i=32,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
 
+flex_baseline<-set_caption(
+ flex_baseline,
+  caption = "Baseline Characteristics",align_with_table = FALSE,
+ word_stylename = "Table Caption",
+  fp_p = fpp
+)
 
 
-my_theme(flex_baseline,y=c(1:32))
 
+
+
+
+flex_baseline<-my_theme(flex_baseline,y=c(1:32))
+saveRDS(flex_baseline,paste(data_path,"/table1_nomissing_flex.rds",sep=""))
+flex_baseline
 ```
 
 
@@ -220,13 +231,13 @@ variables_to_select<-c("SEX","AGE","INCOME","HDL_C","LDL_C","SBP","DBP","BASE_HB
 var_name<-c("Sex","Age, years","Income (pesos/week)","HDL-C(nm)","LDL-C(nm)","Systolic Blood Pressure(mmHg)","Diastolic Blood Pressure(mmHg)","Baseline glycated HbA1c (%)","BMI kg/m2","Waist to Hip Ratio","Education level","Smoking status","Leisure time physical activity","Coronary Artery Disease","Cardiovascular Disease","Cancer","Diabetes (HBA1C>6.5%, self-report or take medication)","Other Diseases")
 list_quintile<-NA
 for (i in 1:7){
-  pgs_quintile<-create_table_1(data=data_prs,variables_to_select = variables_to_select,var_name = var_name,by=paste(pgsname[i],"_quintile",sep=""),compare = T,self_define=5)
+  pgs_quintile<-create_table_1(data=data_prs,variables_to_select = variables_to_select,var_name = var_name,by=paste(pgsname[i],"_quintile",sep=""),compare = T,self_define=5,missing = F)
   colnames(pgs_quintile)[1]<-gsub("_standardised","",pgsname[i])
   pgs_quintile<-pgs_quintile[,c(1:6,8)]
   list_quintile[i]<-list(pgs_quintile)
 }
 
-saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
+#saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep=""))
 ```
 
 
@@ -234,26 +245,28 @@ saveRDS(list_quintile,paste(data_path,"/PRS_quintile_tables_31May2023.rds",sep="
 ```{r,include=FALSE}
 p<-NA
 for (i in 1:7){
-  flex_pgs<-my_table(list_quintile[[i]], y=c(2,3,4,6,8,10,12,14,16,19,22,28,35,41:45),x=1:7)
+  #flex_pgs<-my_table(list_quintile[[i]], y=c(2,3,4,6,8,10,12,14,16,19,22,28,35,41:45),x=1:7)
+  flex_pgs<-my_table(list_quintile[[i]], y=c(2:10,12,15,20,26,31:35),x=1:7)
   flex_pgs <- add_header_row(flex_pgs, values =  c("Characteristic", "Quintiles"," "),
     colwidths = c(1, 5,1), top = T)
   flex_pgs<-add_footer_lines(flex_pgs,"Abbreviation \n SBP:systolic blood pressure, DBP: diastolic blood pressure, BMI: body mass index, NMR:nuclear magnetic resonance, HDL-C: high density lipoprotein cholesterol, LDL-C: low density lipoprotein cholesterol, HbA1c: hemoglobin A1c")
 flex_pgs<-footnote(flex_pgs,i=2,j=1,part="header",ref_symbols="*",value = as_paragraph("Table excludes individuals with age over 75, over one year of inconsistent age between death certificate and baseline or missing genetic data."))
-flex_pgs<-footnote(flex_pgs,i=45,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
+#flex_pgs<-footnote(flex_pgs,i=45,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
+flex_pgs<-footnote(flex_pgs,i=35,j=1,part="body",ref_symbols="§",value = as_paragraph("Other diseases include self-reported emphysema, chronic kidney disease, peptic ulcer,cirrhosis, and peripheral arterial disease."))
 flex_pgs<-footnote(flex_pgs,i=2,j=7,part="header",ref_symbols="$",value = as_paragraph("T-test for continuous traits and Chi Squared test for categorical traits.Round up to 2 decimal places."))
 flex_pgs<-set_caption(
  flex_pgs,
-  caption = paste(pgsname[i], "table"),align_with_table = FALSE,
+  caption = paste(sub("_standardised","",pgsname[i]), "quintile table"),align_with_table = FALSE,
  word_stylename = "Table Caption",
   fp_p = fpp
 )
 flex_pgs<-padding(flex_pgs,padding = 0, part = "all")
 flex_pgs<-line_spacing(flex_pgs,space =0.8, part = "all")
-p[i]<-list(my_theme(flex_pgs,y=c(1:44),z=1:6,fontsize = 6.8))
-
+#p[i]<-list(my_theme(flex_pgs,y=c(1:44),z=1:6,fontsize = 6.8))
+p[i]<-list(my_theme(flex_pgs,y=c(1:34),z=1:6,fontsize = 6.8))
 }
 
-
+saveRDS(p,paste(data_path,"/PRS_quintile_tables_nomissing_flex.rds",sep=""))
 
 ```
 \newpage

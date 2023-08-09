@@ -210,8 +210,8 @@ data<-readRDS(paste(data_path,"/analysis_data_31May2023.rds",sep="/"))
 data_restricted_IID<-data.frame(fread("/well/emberson/users/bjk420/projects/popgen_v2/07_pca/mcps_only/no_references/king/ivs_unrelated-set_oxford.txt", header=F))
 
 colnames(data_ancestry)[1]<-"IID"
-data_ancestry_merge<-merge(data,data_ancestry,by="IID")
+data_ancestry_join<-left_join(data,data_ancestry,by="IID")
 
 data_restricted<-data[data$IID%in%data_restricted_IID$V2,]
-saveRDS(data_ancestry_merge,paste(data_path,"/FullData_ancestry_22Jun2023.rds",sep=""))
+saveRDS(data_ancestry_join,paste(data_path,"/FullData_ancestry_22Jun2023.rds",sep=""))
 saveRDS(data_restricted,paste(data_path,"/RestrictedData_22Jun2023.rds",sep=""))
