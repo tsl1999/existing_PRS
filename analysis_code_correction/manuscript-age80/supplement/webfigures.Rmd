@@ -1,0 +1,104 @@
+---
+title: "Polygenic prediction of coronary artery disease among 130,000 Mexican adults"
+author: "Tianshu Liu"
+date: "2024-06-03"
+output:
+  officedown::rdocx_document:
+    reference_docx: /well/emberson/users/hma817/projects/existing_PRS/margin_template.docx
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(officedown)
+library(officer)
+rm(list=ls())
+#set working directory load package-----------------
+working_path<-'/well/emberson/users/hma817/projects/existing_PRS/correction'
+data_path<-paste(working_path,'/data/manuscript-age80/supplement',sep='')
+graphs_path<-paste(working_path,'/graphs/manuscript-age80/supplement',sep='')
+setwd(working_path)
+
+library(flextable)
+```
+
+\newpage
+<!---BLOCK_LANDSCAPE_START--->
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Logistic regression results with alternative CAD definition \nThe odd ratios given one SD increase in PRS were estimated with continuous regression models partially adjusted for sex and baseline age."}
+knitr::include_graphics(paste(graphs_path,"/all_model_compare_partial.png",sep=""))
+```
+
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Logistic regression results with alternative CAD definition \nThe odd ratios given one SD increase in PRS were estimated with continuous regression models  adjusted for sex, baseline age,waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline ."}
+knitr::include_graphics(paste(graphs_path,"/all_model_compare_full.png",sep=""))
+```
+
+\newpage
+
+
+```{r fig.width = 10,fig.height=6.5,echo=FALSE,fig.cap="Genetic predisposition to CAD mortality risk in Mexicans aged 35-80 years \nThe hazard ratio given one SD increase in PRS were estimated with age-at-risk adjusted cox regression models partially adjusted for sex. Fully adjusted model additionally adjusted for waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline."}
+knitr::include_graphics(paste(graphs_path,"/mortalityEPA_forest.png",sep=""))
+```
+
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different age of follow up   \nOdd ratios (OR) were estimated with regression models adjusted for sex, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/AGE_stratified_age80.png",sep=""))
+```
+
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different levels of BMI   \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/BMI_stratified_age80.png",sep=""))
+```
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different levels of waist to hip ratio   \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/WHRATIO_stratified_age80.png",sep=""))
+```
+
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different levels of Education  \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/EDU_LEVEL_stratified_age80.png",sep=""))
+```
+
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different levels of systolic blood pressure   \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/SBP_stratified_age80.png",sep=""))
+```
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different levels of diastolic blood pressure  \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/DBP_stratified_age80.png",sep=""))
+```
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different status of smoking   \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/smokegp2_stratified_age80.png",sep=""))
+```
+\newpage
+
+```{r fig.width = 8,fig.height=6.5,echo=FALSE,fig.cap="Association of PRSs with CAD risk, at different proportion of indigenous ancestry,  \nOdd ratios (OR) were estimated with regression models adjusted for sex, age at baseline, waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline. "}
+knitr::include_graphics(paste(graphs_path,"/amrscore_stratified_age80.png",sep=""))
+```
+\newpage
+
+```{r fig.width = 10,fig.height=6.5,echo=FALSE,fig.cap="Genetic predisposition to CAD risk in Mexicans aged 80-89 years when CAD is defined as baseline and primary cause of death \nThe odd ratios given one SD increase in PRS were estimated with continuous regression models partially adjusted for sex and baseline age. Fully adjusted model additionally adjusted for waist-to-hip ratio, systolic and diastolic blood pressures, education attainment level, smoking status, and diabetes at baseline."}
+knitr::include_graphics(paste(graphs_path,"/age_80_89EPA_forest.png",sep=""))
+```
+
+
+```{r fig.width = 10,fig.height=6.5,echo=FALSE,fig.cap="Association of externally-derived PRS quintiles with CAD age 80-89 in MCPS, by quintiles of PRSs  \nOdd ratios (OR) were estimated with regression models adjusted for sex and age at baseline. The odds ratio (on log scale) for each of the five quintiles of the eight selected PRSs are plotted against their respective mean PRS in each quintile. The 95% confidence intervals estimated by floating absolute risk are presented as vertical error bars through each point. The size of each estimate point is inversely proportional to their respective standard error. The ORs and the number of CAD cases within each quintile are displayed above and below the corresponding error bar. "}
+knitr::include_graphics(paste(graphs_path,"/age_80_89EPAFAR_ggplot_Partial.png",sep=""))
+```
+
+<!---BLOCK_LANDSCAPE_STOP--->
+
+```{r fig.width = 8,fig.height=10,echo=FALSE,fig.cap="Stepwise adjustment analysis, stratified by sex"}
+
+knitr::include_graphics(paste(graphs_path,"/mediator_plot_sex_80.png",sep=""))
+```

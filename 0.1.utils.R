@@ -12,8 +12,9 @@ library(flextable)
 library(forestploter)
 library(grid)
 library(officer)
+library(Epi)
 # some theme-------------------------------
-tm <- forest_theme(base_size = 5,
+tm <- forest_theme(base_size = 7,
                    core = list(bg_params=list(fill = c("white"))),
                    summary_col = "black",
                    refline_lty = "solid",
@@ -27,11 +28,12 @@ tm <- forest_theme(base_size = 5,
                    vertline_lty = "dashed",
                    vertline_col = "grey20",xaxis_cex=0.9,
                    ci_lty =1 ,
-                   ci_lwd = 0.5,
-                   ci_Theight = 0.1)
+                   ci_lwd = 1,
+                   ci_Theight = 0)
 
-tm2 <- forest_theme(base_size = 5,
-                    core = list(bg_params=list(fill = c("white"))),
+tm2 <- forest_theme(base_size = 7,
+                    core = list(bg_params=list(fill = c("white")),
+                                fg_params=list(hjust=0,x=0)),
                     ci_pch = c(15, 16),
                     ci_col = c("black", "navy"),
                     footnote_col = "black",
@@ -42,11 +44,62 @@ tm2 <- forest_theme(base_size = 5,
                     vertline_lty = "dashed",
                     vertline_col = "grey20",xaxis_cex=0.9,
                     ci_lty =1 ,
-                    ci_lwd = 0.5,
-                    ci_Theight = 0.1)
+                    ci_lwd = 1,
+                    ci_Theight = 0,
+                    colhead=list(fg_params=list(hjust=0, x=0)))
 
 fpp <- fp_par(text.align = "left", padding = 3)
 
+ci_manual<-function(x,se,number=95,roundup=3){
+  actualci<-(100-(100-number)/2)/100
+  ci_bound<-c(-qnorm(actualci,0,1),qnorm(actualci,0,1))
+  ci<-c(x,x+ci_bound*se)
+  ci
+}
+my_table<-function(table,x=c(1:4),y=1){
+  flext<-flextable(table)
+  flext<-autofit(flext)
+  flext<-bold(flext,i=1,j=x,part='header')
+  if(is.null(y)==F){
+    flext<-bold(flext,i=y,j=1,part='body')
+  }else{}
+  flext
+  
+}
+
+my_theme<-function(x,y,z=NULL,align_x=NULL,fontsize=8,border="gray",
+                   header_border=4,set_padding=0,font="Calibri"){
+  std_border = fp_border(color=border)
+  out_border = fp_border(color="black", width = 2)
+  x <- fontsize(x, size = fontsize, part = "all")
+  if(is.null(align_x)==F){
+    x<-align(x,align = align_x, part = "header")
+  }
+  x<-set_table_properties(x,layout = "autofit")
+  x<-border_remove(x)
+  #x <- border_outer(x, part="header", border = out_border )
+  #x<-bg(x,bg = "grey", part = "header")
+  x<-hline_top(x,part='all',border = out_border )
+  x<-hline_bottom(x,part='body',border = out_border )
+  x<-hline(x,i=1,j=2:header_border,part='header',border = out_border )
+  
+  
+  if(is.null(y)==T){}else{
+    x<-hline(x,i=y,part='body',border = std_border )}
+  if(is.null(z)==T){}else{
+    x<-vline(x,j=z,part='body',border = std_border )}
+  
+  x<-fontsize(x, size = fontsize-1, part = "footer")
+  x<-italic(x, italic = TRUE, part = "footer")
+  x<-padding(x,padding = set_padding, part = "all")
+  x<-line_spacing(x,space =0.9, part = "all")
+  
+  
+  x <- flextable::font(x, part = "header", fontname = font)
+  x <- flextable::font(x, part = "body", fontname = font)
+  x <- flextable::font(x, part = "footer", fontname = font)
+  x
+}
 
 readin_prs<-function(prs){
   
@@ -126,7 +179,7 @@ run_glm<-function(data,adjustments,outcome,pgs_name,int=NULL){
 
 #run_glm(data,adjustments,outcome,"PGS000011")
 #a<-run_glm(data,adjustments,outcome,"PGS000011",int="SEX")
-create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,adjustments,outcome,namew,type="cont",roc=T,int=NULL){
+create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,adjustments,outcome,namew,type="cont",roc=T,int=NULL,se=F){
   
   if(trainsplit==F){
     train_data=data
@@ -143,7 +196,8 @@ create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,a
   start_column=which(colnames(train)%in%colnames(train%>%select(contains(colnames(model_table_top)[2:ncol(model_table_top)]))))
   
   if(type=="cont"){
-    model_output_table<-data.frame(OR=NA,LR=NA,UR=NA,AUC=NA,AUC_LR=NA,AUC_UR=NA,Nagelkerke_PseudoR2=NA,lee_PseudoR2=NA,case_no=NA,control_no=NA,pval=NA,int_pval=NA)
+    model_output_table<-data.frame(OR=NA,LR=NA,UR=NA,AUC=NA,AUC_LR=NA,AUC_UR=NA,Nagelkerke_PseudoR2=NA,
+                                   lee_PseudoR2=NA,case_no=NA,control_no=NA,pval=NA,int_pval=NA,se=NA)
     
     if(roc==T){
       png(paste(graphs_path,"/logistic/AUCplot_cont","_",outcome,"_",namew,".png",sep=""),res=150,width = 15, height = 15,units = "cm")}
@@ -162,30 +216,32 @@ create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,a
       
       vr=runif(nrow(train),0,1)
       vsel=model_output$linear.predictors[model_output$y==0|vr<0.05]
-      r2<-format(round(var(vsel)/(var(vsel)+pi^2/3),3),nsmall=3)
+      r2<-format(round(var(vsel)/(var(vsel)+pi^2/3),2),nsmall=2)
       
       
       auc_point<-auc(roc_prs)
-      auc_ci<-format(round(ci.auc(test[,outcome],pred),3),nsmall=3)
+      auc_ci<-format(round(ci.auc(test[,outcome],pred),2),nsmall=2)
       
       pval<-summary(model_output)$coefficients[,"Pr(>|z|)"][2]
-      pval<-format(signif(pval,3),nsmall=3)
+      pval<-format(signif(pval,2),nsmall=2)
       #pval<-as.character(signif(pval,digits=2))
       #pval = sub("e"," 10^",pval) 
       if(is.null(int)==F){
         int_pval<-summary(model_output)$coefficients[,"Pr(>|z|)"][nrow(summary(model_output)$coefficients)]
-        int_pval<-format(signif(int_pval,3),nsmall=3)}else{int_pval=NA}
-      or_ci<-format(ci(model_output,roundup=3),nsmall=3)
+        int_pval<-format(signif(int_pval,2),nsmall=2)}else{int_pval=NA}
+      or_ci<-format(ci(model_output,roundup=2),nsmall=2)
       
       #pval<-ifelse(summary(model_output)$coefficients[,"Pr(>|z|)"][2]<0.001,"<0.001",round(summary(model_output)$coefficients[,"Pr(>|z|)"][2],3))
-      model_output_table[i,]<-c(or_ci[1],or_ci[2],
+      model_output_table[i,1:12]<-c(or_ci[1],or_ci[2],
                                 or_ci[3],auc_ci[2],auc_ci[1],auc_ci[3],
-                                format(round(PseudoR2(model_output,c("Nagelkerke")),3),nsmall=3),r2,
+                                format(round(PseudoR2(model_output,c("Nagelkerke")),2),nsmall=2),r2,
                                 table(train[,outcome])["1"], table(train[,outcome])["0"],
                                 pval,int_pval)
       
       
-      
+      if(se==T){
+        model_output_table$se[i]<-summary(model_output)$coefficients[,"Std. Error"][2]
+      }else{model_output_table<-model_output_table[,1:12]}
       rownames(model_output_table)[i]<-colnames(train)[start_column[i]]
       
     }
@@ -195,7 +251,7 @@ create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,a
              col=c(palette()[1:length(start_column)]),lty=1,cex=0.8)
       dev.off()}
     if(is.null(int)==F){model_output_table<-model_output_table}else{
-      model_output_table<-model_output_table[,1:11]
+      model_output_table<-model_output_table[,-c(12)]
     }
     
     output<-model_output_table
@@ -210,9 +266,9 @@ create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,a
     for (i in 1:length(start_column)){
       model_output<-run_glm(data=train,adjustments,outcome,colnames(train)[start_column[i]],int=NULL)
       fl_a<-float(model_output,factor =colnames(train)[start_column[i]])
-      model_estimate_output_table<-data.frame(estimate = round(exp(fl_a$coef), 3),
-                                              LR = round(exp(fl_a$coef - 1.96 * sqrt(fl_a$var)), 3),
-                                              UR = round(exp(fl_a$coef + 1.96 * sqrt(fl_a$var)), 3),
+      model_estimate_output_table<-data.frame(estimate = round(exp(fl_a$coef), 2),
+                                              LR = round(exp(fl_a$coef - 1.96 * sqrt(fl_a$var)), 2),
+                                              UR = round(exp(fl_a$coef + 1.96 * sqrt(fl_a$var)), 2),
                                               SE=fl_a$var,
                                               case=table(train[,colnames(train)[start_column[i]]],train[,outcome])[,2],
                                               control=table(train[,colnames(train)[start_column[i]]],train[,outcome])[,1])
@@ -233,10 +289,10 @@ create_output_table<-function(trainsplit=F,data,train_data=NULL,test_data=NULL,a
       vsel=model_output$linear.predictors[model_output$y==0|vr<0.05]
       r2<-round(var(vsel)/(var(vsel)+pi^2/3),3)
       
-      auc_ci<-round(ci.auc(test[,outcome],pred),3)
+      auc_ci<-round(ci.auc(test[,outcome],pred),2)
       
       model_output_table[i,]<-c(auc_ci[2],auc_ci[1],auc_ci[3],
-                                round(PseudoR2(model_output,c("Nagelkerke")),3),r2,
+                                round(PseudoR2(model_output,c("Nagelkerke")),2),r2,
                                 table(train[,outcome])["1"], table(train[,outcome])["0"])
       rownames(model_output_table)[i]<-colnames(train)[start_column[i]]
     }
@@ -355,8 +411,15 @@ plot_FAR_up<-function(model_output_list,name,outcome,type="OR"){
   }
   par(mfrow=c(1,1))
 }
+extract_legend <- function(my_ggp) {
+  step1 <- ggplot_gtable(ggplot_build(my_ggp))
+  step2 <- which(sapply(step1$grobs, function(x) x$name) == "guide-box")
+  step3 <- step1$grobs[[step2]]
+  return(step3)
+}
 
-plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data){
+plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data,outcome_name=outcome,
+                      graphs_path="/well/emberson/users/hma817/projects/existing_PRS/correction/graphs"){
   or_hr<-ifelse(type=="OR","Odds Ratio","Hazard Ratio")
   saveor_hr<-ifelse(type=="OR","/logistic","/cox")
   no_model<-length(model_output_list)
@@ -364,12 +427,12 @@ plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data){
   
   library(grid)
   library(gridExtra)
-  
+  #saveor_hr,
   for(j in 1:no_model){
-    png(paste(graphs_path,saveor_hr,"/FAR_ggplot_",outcome,"_",name[j],".png",sep=""),width = 20*no_model,height = 30,units = "cm",res=80*7)
+    png(paste(graphs_path,"/",outcome,"FAR_ggplot_",name[j],".png",sep=""),width = 20*no_model,height = 30,units = "cm",res=80*7)
     ylim=data.frame(min=NA,max=NA)
     
-    for(i in 1:(ncol(model_table_top)-1)){
+    for(i in 1:npgs){
       ylim[i,1]<-min(model_output_list[[j]][[2]][[i]]$LR)
       ylim[i,2]<-max(model_output_list[[j]][[2]][[i]]$UR)
     }
@@ -377,50 +440,50 @@ plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data){
     ymax=max(ylim$max)
     ymin=min(ylim$min)
     p<-list()
-    for (i in 1:(ncol(model_table_top)-1)){
+    for (i in 1:npgs){
       
-      model_name<-paste(colnames(model_table_top)[i+1],"_cat",sep="")
-      model_estimate<-model_output_list[[j]][[2]][[which(sapply(model_output_list[[j]][[2]], function(x) colnames(x)[1]==model_name))]]
-      model_pgs_reading<-data[,c(sub("_cat","",colnames(model_estimate)[1]),model_name)]
+      pgs_name<-paste(colnames(model_table_top)[i+1],"_cat",sep="")
+      model_estimate<-model_output_list[[j]][[2]][[which(sapply(model_output_list[[j]][[2]], function(x) colnames(x)[1]==pgs_name))]]
+
+      model_pgs_reading<-data[,c(sub("_cat","",colnames(model_estimate)[1]),pgs_name)]
       model_pgs_reading_decile<-data.frame(decile=NA,avg=NA)
       model_pgs_reading_decile[1:length(levels(model_pgs_reading[,2])),1]<-levels(model_pgs_reading[,2])
       for (k in 1:length(levels(model_pgs_reading[,2]))) {
         model_pgs_reading_decile[k,2]<-mean(model_pgs_reading[model_pgs_reading[,2]==model_pgs_reading_decile[k,1],1])
       }
+
+      colnames(model_pgs_reading_decile)[1]<-pgs_name
+      model_estimate<-merge(model_estimate,model_pgs_reading_decile,by=c(pgs_name))
+      
       
       
       if(i==1|(i-1)%%4==0){
-        p[[i]]<-ggplot(model_estimate, aes(x=model_pgs_reading_decile$avg, y=estimate)) + 
-          geom_line(linetype="dashed",color="gray") +
+        p[[i]]<-ggplot(model_estimate, aes(x=avg, y=estimate)) + 
+          geom_smooth(linetype="dashed",color="gray",method = "lm", se = FALSE) +
           geom_point(aes(size=0.0001/SE),shape=15)+
-          annotate("text",x=model_pgs_reading_decile$avg, y=model_estimate$UR+0.05, label=model_estimate$estimate,size=3)+
-          annotate("text",x=model_pgs_reading_decile$avg, y=model_estimate$LR-0.05, label=paste(model_estimate$case),size=3)+
+          annotate("text",x=model_estimate$avg, y=model_estimate$UR+0.05, label=format(model_estimate$estimate,nsmall=2),size=4)+
+          annotate("text",x=model_estimate$avg, y=model_estimate$LR-0.05, label=model_estimate$case,size=4)+
           geom_pointrange(aes(ymin=LR, ymax=UR), 
                           position=position_dodge(0.05),shape=15)+theme_classic()+
-          theme(legend.position = "none",plot.title = element_text(size = 7, face = "bold"),axis.title.y = element_text(face="bold"))+
+          theme(legend.position = "none",plot.title = element_text(size = 8, face = "bold"),axis.title.y = element_text(face="bold"))+
           scale_fill_discrete(name = " ")+scale_y_continuous(trans = "log",limits = c(ymin-0.1,ymax+0.1), breaks = seq(0.9, ymax,0.2))+
-          ggtitle(paste(model_table_top[3,sub("_cat","",colnames(model_estimate)[1])],"\n No. of SNPs:",model_table_top[1,sub("_cat","",colnames(model_estimate)[1])]))+
+          ggtitle(paste(model_table_top[4,sub("_cat","",colnames(model_estimate)[1])]))+
           xlab(" ")+ylab(paste(or_hr, "(95%CI)"))+
-          scale_x_continuous(breaks=c(model_pgs_reading_decile$avg),labels=c(1:length(model_pgs_reading_decile$avg)),limits = c(-1.8,1.8))
-        
-        
-        
+          scale_x_continuous(breaks=c(model_estimate$avg),labels=model_estimate[,1],limits = c(-1.8,1.8))
         
       }else{
-        p[[i]]<-ggplot(model_estimate, aes(x=model_pgs_reading_decile$avg, y=estimate)) + 
-          geom_line(linetype="dashed",color="gray") +
+        p[[i]]<-ggplot(model_estimate, aes(x=avg, y=estimate)) + 
+          geom_smooth(linetype="dashed",color="gray",method = "lm", se = FALSE) +
           geom_point(aes(size=0.0001/SE),shape=15)+
-          annotate("text",x=model_pgs_reading_decile$avg, y=model_estimate$UR+0.05, label=model_estimate$estimate,size=3)+
-          annotate("text",x=model_pgs_reading_decile$avg, y=model_estimate$LR-0.05, label=paste(model_estimate$case),size=3)+
-          geom_pointrange(aes(ymin=LR, ymax=UR),
-                          position=position_dodge(0.05),shape=15)+
-          theme_classic()+theme(legend.position = "none",plot.title = element_text(size = 7, face = "bold"),axis.title.y = element_text(face="bold"))+
-          scale_fill_discrete(name = " ")+scale_y_continuous(trans = "log",limits = c(ymin-0.1,ymax+0.1), breaks = NULL)+
-          ggtitle(paste(model_table_top[3,sub("_cat","",colnames(model_estimate)[1])],"\n No. of SNPs:",model_table_top[1,sub("_cat","",colnames(model_estimate)[1])]))+
+          annotate("text",x=model_estimate$avg, y=model_estimate$UR+0.05, label=format(model_estimate$estimate,nsmall=2),size=4)+
+          annotate("text",x=model_estimate$avg, y=model_estimate$LR-0.05, label=model_estimate$case,size=4)+
+          geom_pointrange(aes(ymin=LR, ymax=UR), 
+                          position=position_dodge(0.05),shape=15)+theme_classic()+
+          theme(legend.position = "none",plot.title = element_text(size = 8, face = "bold"),axis.title.y = element_text(face="bold"))+
+          scale_fill_discrete(name = " ")+scale_y_continuous(trans = "log",limits = c(ymin-0.1,ymax+0.1), breaks = seq(0.9, ymax,0.2))+
+          ggtitle(paste(model_table_top[4,sub("_cat","",colnames(model_estimate)[1])]))+
           xlab(" ")+ylab(" ")+
-          scale_x_continuous(breaks=c(model_pgs_reading_decile$avg),labels=c(1:length(model_pgs_reading_decile$avg)),limits = c(-1.8,1.8))
-        
-        
+          scale_x_continuous(breaks=c(model_estimate$avg),labels=model_estimate[,1],limits = c(-1.8,1.8))
         
       }
       
@@ -431,7 +494,6 @@ plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data){
     grid.arrange(arrangeGrob(grobs=lapply(p, function(p) p + guides(scale="None")), ncol=4, 
                              bottom=textGrob("Polygenic risk score quintiles",
                                              gp=gpar(fontface="bold", col="Black", fontsize=10)),
-                             top=textGrob(paste("Association of Polygenic risk scores and",outcome,"in",name[j],"model",sep=" "),gp=gpar(fontface="bold", col="Black", fontsize=14)),
                              sub = textGrob("Footnote", x = 2, hjust = 1, vjust=1, gp = gpar(fontface = "italic", fontsize = 10))))
     
     
@@ -443,6 +505,130 @@ plot_FAR_gg<-function(model_output_list,name,outcome,type="OR",data=data){
     
   }}
   
+
+library(viridis)
+
+plot_FAR_gg_strata<-function(model_output_list,name,outcome,type="OR",
+                             data=data,outcome_name=outcome,by=NULL){
+  or_hr<-ifelse(type=="OR","Odds Ratio","Hazard Ratio")
+  saveor_hr<-ifelse(type=="OR","/logistic","/cox")
+  if(is.null(by)==T){
+    no_model<-length(model_output_list)
+  }else{
+    no_model<-length(model_output_list)/length(by) #list for each strata
+  }
+  no_strata<-length(by)
+  
+  
+  library(grid)
+  library(gridExtra)
+  
+  
+  for(j in 1:no_model){
+    png(paste(graphs_path,saveor_hr,"/FAR_ggplot_",outcome,"_",name[j],".png",sep=""),width = 40,height = 30,units = "cm",res=80*npgs)
+    ylim=data.frame(name=NA,ymin=NA,ymax=NA,category=NA)
+    
+    
+    for (x in 1:no_strata ){
+      ylim_in<-data.frame(name=NA,ymin=NA,ymax=NA,category=rep(by[x],npgs))
+      for(i in 1:npgs){
+        interval<-length(model_output_list)/no_strata
+        ylim_in[i,2]<-min(model_output_list[[no_model*x+j-interval]][[2]][[i]]$LR)
+        ylim_in[i,3]<-max(model_output_list[[no_model*x+j-interval]][[2]][[i]]$UR)
+        ylim_in$name[i]<-paste(colnames(model_table_top)[i+1],"_cat",sep="")
+      }
+      ylim<-rbind(ylim,ylim_in)}
+    ylim<-ylim[2:nrow(ylim),]
+    
+    ymax=max(ylim$ymax)
+    ymin=min(ylim$ymin)
+    
+    p_output<-list()
+    for (i in 1:npgs){
+      model_name<-paste(colnames(model_table_top)[i+1],"_cat",sep="")
+      model_estimate_all<-data.frame()
+      model_pgs_reading_decile_all<-data.frame()
+      for(x in 1: length(by)){
+        interval<-length(model_output_list)/no_strata
+        model_estimate<-model_output_list[[no_model*x+j-interval]][[2]][[which(sapply(model_output_list[[no_model*x+j-interval]][[2]], function(x) colnames(x)[1]==model_name))]]
+        model_estimate$category<-by[x]
+        model_estimate_all<-rbind(model_estimate_all,model_estimate)
+        
+        
+        model_pgs_reading<-data[data$SEX==by[x],c(sub("_cat","",colnames(model_estimate)[1]),model_name)]
+        model_pgs_reading_decile<-data.frame(decile=NA,avg=NA)
+        model_pgs_reading_decile[1:length(levels(model_pgs_reading[,2])),1]<-levels(model_pgs_reading[,2])
+        for (k in 1:length(levels(model_pgs_reading[,2]))) {
+          model_pgs_reading_decile[k,2]<-mean(model_pgs_reading[model_pgs_reading[,2]==model_pgs_reading_decile[k,1],1])
+        }
+        model_pgs_reading_decile$category<-by[x]
+        model_pgs_reading_decile_all<-rbind(model_pgs_reading_decile_all,model_pgs_reading_decile)
+        
+        
+      }
+      
+      colnames(model_pgs_reading_decile_all)[1]<-model_name
+      model_estimate_all<-merge(model_estimate_all,model_pgs_reading_decile_all,by=c(model_name,"category"))
+      model_estimate_all$avg_new<-ifelse(model_estimate_all$category==by[1],model_estimate_all$avg,
+                                         model_estimate_all$avg+0.1)
+      
+      
+      if(i==1|(i-1)%%4==0){
+        p<- ggplot(model_estimate_all, aes(x=avg_new, y=estimate,colour=category,inherit.aes==T)) + 
+          geom_smooth(linetype="dashed",method = "lm", se = FALSE) +
+          geom_point(aes(size=0.0001/SE),shape=15,alpha=0.8)+
+          geom_pointrange(aes(ymin=LR, ymax=UR),alpha=0.8,shape=15)+theme_classic()+scale_color_manual(values=c("skyblue", "tomato", "black","#69b3a2"))+
+          theme(legend.position = "none",plot.title = element_text(size = 8, face = "bold"),axis.title.y = element_text(face="bold"))+
+          scale_fill_discrete(name = " ")+scale_y_continuous(trans = "log",limits = c(ymin-0.1,ymax+0.1), breaks = seq(0.9, ymax,0.2))+
+          ggtitle(paste(model_table_top[3,sub("_cat","",colnames(model_estimate_all)[1])]))+
+          xlab(" ")+ylab(paste(or_hr, "(95%CI)"))+
+          scale_x_continuous(breaks=c(model_estimate_all$avg),labels=c(model_estimate_all[,1]),limits = c(-1.8,1.8))
+        
+        
+        
+        
+        q<-ggplot(data=model_estimate_all,aes(x=avg, y=estimate,size=0.0001/SE,colour=category))+geom_point( shape=15,alpha=0.5)+
+          geom_smooth(linetype="dashed",method = "lm", se = FALSE)+scale_color_manual(values=c("skyblue", "tomato", "black","#69b3a2"))+
+          theme(legend.position = "bottom",legend.title=element_blank())+
+          guides(size="none")
+        
+        shared_legend <- extract_legend(q)
+        p_output[[i]]<-p
+      }else{
+        p<- ggplot(model_estimate_all, aes(x=avg_new, y=estimate,colour=category,inherit.aes==T)) + 
+          geom_smooth(linetype="dashed",method = "lm", se = FALSE) +
+          geom_point(aes(size=0.0001/SE),shape=15,alpha=0.8)+
+          geom_pointrange(aes(ymin=LR, ymax=UR),alpha=0.8,shape=15)+theme_classic()+scale_color_manual(values=c("skyblue", "tomato", "black","#69b3a2"))+
+          theme(legend.position = "none",plot.title = element_text(size = 8, face = "bold"),axis.title.y = element_text(face="bold"))+
+          scale_fill_discrete(name = " ")+scale_y_continuous(trans = "log",limits = c(ymin-0.1,ymax+0.1), breaks = seq(0.9, ymax,0.2))+
+          ggtitle(paste(model_table_top[3,sub("_cat","",colnames(model_estimate_all)[1])]))+
+          xlab(" ")+ylab(" ")+
+          scale_x_continuous(breaks=c(model_estimate_all$avg),labels=c(model_estimate_all[,1]),limits = c(-1.8,1.8))
+        
+        
+        p_output[[i]]<-p
+        
+      }
+      
+      
+    }
+    
+    
+    
+    grid.arrange(arrangeGrob(grobs=lapply(p_output, function(x) x + guides(scale="None")), ncol=4, 
+                             bottom=textGrob("Polygenic risk score quintiles",
+                                             gp=gpar(fontface="bold", col="Black", fontsize=10)),
+                             sub = textGrob("Footnote", x = 2, hjust = 1, vjust=1, gp = gpar(fontface = "italic", fontsize = 10))),shared_legend ,heights=c(5, 0.5),nrow=2)
+    
+    
+    
+    
+    
+    dev.off()
+    
+    
+  }}
+
 #create_output_table(trainsplit = F,data,adjustments=adjustments,outcome=outcome,namew=NULL)
 
 create_surv_formula<-function(adjustments,strata=NULL,outcome,pgs_name){
@@ -458,7 +644,7 @@ create_surv_formula<-function(adjustments,strata=NULL,outcome,pgs_name){
   output_formula
   }
 
-#create_surv_formula(adjustments=adjustments,outcome=outcome,pgs_name=pgs_name)
+#create_surv_formula(adjustments=partial_adjustments,outcome=outcome,pgs_name=pgs_name)
 
 run_cox<-function(data,adjustments,strata=NULL,outcome,pgs_name){
   cat("\n Modelling ",pgs_name)
@@ -488,25 +674,25 @@ create_output_table_cox<-function(trainsplit=F,data,train_data=NULL,test_data=NU
     for (i in 1:length(start_column)){
       
       model_output<-run_cox(data=train,adjustments,strata,outcome,pgs_name=colnames(train)[start_column[i]])
-      dir.create(paste(graphs_path,"/cox/",colnames(train)[start_column[i]],sep=""))
-      if (ph==T){
       
+      if (ph==T){
+        dir.create(paste(graphs_path,"/cox/",colnames(train)[start_column[i]],sep=""))
       jpeg(paste(graphs_path,"/cox/",colnames(train)[start_column[i]],"/",colnames(train)[start_column[i]],"_Schoenfeld_residual",type,namew,".png",sep=""),width = 800, height = 600)
       cox.zph.fit <- cox.zph(model_output)
       p<-ggcoxzph(cox.zph.fit,font.main = 8)
       print(p)
       dev.off()}
       
-      hr_ci<-format(round(summary(model_output)$conf.int[1,c(1,3:4)],3),nsmall=3)
+      hr_ci<-format(round(summary(model_output)$conf.int[1,c(1,3:4)],2),nsmall=2)
       
-      c_index<-format(round(ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var)),3),nsmall=3)
+      c_index<-format(round(ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var)),2),nsmall=2)
       case_no<-sum(train[,outcome]==1)
       case_id<-unique(train[train[,outcome]==1,"IID"])
       
       control<-train[!train$IID%in%case_id,]
       control_no<-length(unique(control[control[,outcome]==0,"IID"]))
       pval<-summary(model_output)$coefficients[colnames(train)[start_column[i]],"Pr(>|z|)"]
-      pval<-format(signif(pval,3),nsmall=3)
+      pval<-format(signif(pval,2),nsmall=2)
       
       model_output_table[i,]<-c(hr_ci[1],hr_ci[2],hr_ci[3],
                                 c_index[1],c_index[2],c_index[3],case_no,control_no,pval)
@@ -521,9 +707,9 @@ create_output_table_cox<-function(trainsplit=F,data,train_data=NULL,test_data=NU
         model_output<-run_cox(data = train,adjustments,strata,outcome,colnames(train)[start_column[i]])
         fl_a<-float(model_output,factor =colnames(train)[start_column[i]])
 
-        model_estimate_output_table<-data.frame(estimate = round(exp(fl_a$coef), 3),
-                                                LR = round(exp(fl_a$coef - 1.96 * sqrt(fl_a$var)), 3),
-                                                UR = round(exp(fl_a$coef + 1.96 * sqrt(fl_a$var)), 3),
+        model_estimate_output_table<-data.frame(estimate = round(exp(fl_a$coef), 2),
+                                                LR = round(exp(fl_a$coef - 1.96 * sqrt(fl_a$var)), 2),
+                                                UR = round(exp(fl_a$coef + 1.96 * sqrt(fl_a$var)), 2),
                                                 SE=fl_a$var,
                                                 case=NA,
                                                 control=NA)
@@ -549,7 +735,7 @@ create_output_table_cox<-function(trainsplit=F,data,train_data=NULL,test_data=NU
         print(p)
         dev.off()}
         
-        c_index<-format(round(ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var)),3),nsmall=3)
+        c_index<-format(round(ci_manual(x=concordance(model_output)$concordance,se=sqrt(concordance(model_output)$var)),2),nsmall=2)
         case_no<-sum(train[,outcome]==1)
         case_id<-unique(train[train[,outcome]==1,"IID"])
         
@@ -672,7 +858,7 @@ generate_forest_table<-function(tables,model_name,or_hr="OR",show_pgsname=F,int=
   model_list<-tables
   for (i in 1:(ncol(model_table_top)-1)){
     if (show_pgsname==T){
-  forest_table<-rbind(forest_table,c(model_table_top[3,i+1],rep(" ",ncol(forest_table)-1)))
+  forest_table<-rbind(forest_table,c(model_table_top[4,i+1],rep(" ",ncol(forest_table)-1)))
     }else{
     forest_table<-rbind(forest_table,c(colnames(model_table_top)[i+1],rep(" ",ncol(forest_table)-1)))}
     for (j in 1:n_table){
@@ -694,10 +880,15 @@ generate_forest_table<-function(tables,model_name,or_hr="OR",show_pgsname=F,int=
   forest_table<-forest_table[2:nrow(forest_table),]
   
   forest_table$" "<- paste(rep(" ", 40), collapse = " ")
+  if(or_hr=="OR"){
+    auc="AUC (95%CI)"
+  } else if (or_hr=="HR"){
+    auc="Harrell's C-stats (95%CI)"
+  }
   if(is.null(int)==T){
-    colnames(forest_table)<-c("PRS name","Number of CAD cases", "Number of CAD controls", "estimate","LR","UR"," ","AUC (95%CI)","p-value","   ")
+    colnames(forest_table)<-c("PRS name","CAD cases", "CAD controls", "estimate","LR","UR"," ",auc,"p-value","   ")
   }else{
-    colnames(forest_table)<-c("PRS name","Number of CAD cases", "Number of CAD controls", "estimate","LR","UR"," ","AUC (95%CI)","p-value",paste("Interaction with",int,"(p-value)" ,sep=" "),"   ")
+    colnames(forest_table)<-c("PRS name","CAD cases", "CAD controls", "estimate","LR","UR"," ",auc,"p-value",paste("Interaction with",int,"(p-value)" ,sep=" "),"   ")
   }
   
   
@@ -707,43 +898,50 @@ generate_forest_table<-function(tables,model_name,or_hr="OR",show_pgsname=F,int=
 }
 
 
-plot_forest<-function(forest_table,xlim,ticks_at,theme,hr_or="OR",theme_in="tm2",col_input=c(1:3,7,10,8,9)){
+plot_forest<-function(forest_table,xlim,ticks_at,theme,hr_or="OR",
+                      theme_in="tm2",col_input=c(1:3,10,7,9,8),ci_column=4,primary_analysis=T,
+                      footnote_in=NULL){
   if(theme_in=="tm"){
   p <- forest(forest_table[,col_input],
               est = as.numeric(forest_table$estimate),
               lower = as.numeric(forest_table$LR), 
               upper = as.numeric(forest_table$UR),
-              ci_column = 5,
+              ci_column = ci_column,
               ref_line = 1,
               vert_line = c(as.numeric(forest_table[forest_table[,1]=="Overall",]$estimate)),
               arrow_lab = c("Lower risk of CAD", "Higher risk of CAD"),
               xlim = xlim,
+              sizes=0.5,
               ticks_at = ticks_at,
               is_summary = c(rep(FALSE, nrow(forest_table)-1), TRUE),
-              footnote = "\n\n\n\n\n\n\n\n\n Odds Ratios estimated separately by levels of included variable, adjusted for sex, baseline age,education level, \n smoking status, blood pressure and waist-hip ratio if they are not included in the strata. \n For analysis on HbA1c strata, adjustments excluded baseline diabetes.",
+              footnote = footnote_in,
+              fontfamily ="Calibri",
               theme=tm)}else{
                 p <- forest(forest_table[,col_input],
                             est = as.numeric(forest_table$estimate),
                             lower = as.numeric(forest_table$LR), 
                             upper = as.numeric(forest_table$UR),
-                            ci_column = 5,
+                            ci_column = ci_column,
                             ref_line = 1,
                             arrow_lab = c("Lower risk of CAD", "Higher risk of CAD"),
                             xlim = xlim,
                             ticks_at = ticks_at,
-                            footnote = ifelse(hr_or=="OR","\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and baseline age. Fully adjusted model additionally adjusts for education level, smoking status, \n blood pressure and waist-hip ratio ",
-                                              "\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and age group. Fully adjusted model additionally adjusts for education level, smoking status, \n blood pressure and waist-hip ratio "),
+                            fontfamily ="Calibri",
+                            sizes=0.5,
+                            footnote = ifelse(is.null(footnote_in)==F,paste("\n\n\n\n\n\n\n\n\n",footnote_in),ifelse(hr_or=="OR","\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and baseline age. Fully adjusted model additionally adjusts for education level, smoking status, \n blood pressure and waist-hip ratio ",
+                                              "\n\n\n\n\n\n\n\n\n Partially adjusted model adjusts for sex and age group. Fully adjusted model additionally adjusts for education level, smoking status, \n blood pressure and waist-hip ratio ")),
                             theme=tm2)
               }
+
   
   p <- add_border(p, 
                   part = "header", 
                   row = 1,
                   col = 1:length(col_input), gp = gpar(lwd = 1))
-  
+  if(primary_analysis==T){
   p <- add_border(p, 
                   part = "body", 
-                  col = c(2:4,6:length(col_input)),row=1:nrow(forest_table),
+                  col = c(2:3,5:length(col_input)),row=1:nrow(forest_table),
                   gp = gpar(lwd = .5))
   
   
@@ -753,10 +951,17 @@ plot_forest<-function(forest_table,xlim,ticks_at,theme,hr_or="OR",theme_in="tm2"
   p <- add_text(p, text = paste(hr_or, "per SD (95% CI)",sep=" "),
                 part = "header", 
                 col = 4:5,row=1,
-                gp = gpar(fontface="bold",fontsize=5))
+                gp = gpar(fontface="bold",fontsize=7))}
   p
   
 }
+
+
+
+
+
+
+
 
 combine_model_tables<-function(tables,name,log_cox){
   n_table<-length(tables)
@@ -930,7 +1135,103 @@ create_quntile_char<-function(data_prs, pgs,variables_to_select,var_name){
 }
 
 
-create_table_1<-function(data,variables_to_select,var_name,by,compare=F,missing=T,self_define=NULL){
+# create_table_1<-function(data,variables_to_select,var_name,by,compare=F,missing=T,self_define=NULL){
+#   data_keep<-data[,c(variables_to_select,by)]
+#   data_cha<-NA
+#   compare_level<-levels(data_keep[,by])
+#   level_length<-length(compare_level)
+#   for (i in 1:length(variables_to_select)){
+#     data_cha[i]<-class(data_keep[,i])
+#   }
+#   factor_var<-data_keep[,c(which(data_cha=="factor"))]
+#   factor_var_name<-c(var_name[which(data_cha=="factor")])
+#   cat_table<-NA
+#   numeric_var<-data_keep[,c(which(data_cha=="numeric"|data_cha=="integer"))]
+#   numeric_var_name<-var_name[which(data_cha=="numeric"|data_cha=="integer")]
+#   cont_table<-NA
+#   
+#   if (compare==F){
+#     for (i in 1:(length(factor_var))){
+#       if(missing==T){
+#         cat_table<-rbind(cat_table,cate_table(x=factor_var[,i],data=data_keep[,by],name=paste(factor_var_name[i],", N(%)",sep=""),use_preset_level = T))
+#       }else{
+#         cat_table<-rbind(cat_table,cate_table(x=factor_var[,i],data=data_keep[,by],name=paste(factor_var_name[i],", N(%)",sep=""),use_preset_level = T,missing = F))
+#       }
+#       
+#       
+#     }
+#     colnames(cat_table)<-c(" ",levels(data_keep[,by]),"Overall")
+#     for (i in 1:(length(numeric_var))){
+#       if(sum(is.na(numeric_var[,i]))==0|missing==F){
+#         cont_table<-rbind(cont_table,get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define=self_define))
+#       }else if (sum(is.na(numeric_var[,i]))!=0&missing==T){
+#         x_update<-ifelse(is.na(numeric_var[,i])==T,"Missing",numeric_var[,i])
+#         cont_table<-rbind(cont_table,get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),get_prop_multi(x_update,"Missing",data_keep[,by]))
+#       }
+#     }
+#     
+#     colnames(cont_table)<-c(" ",levels(data_keep[,by]),"Overall")
+#     
+#   }else if (compare==T){
+#     for (i in 1:(length(factor_var))){
+#       chi_test<-chisq.test(factor_var[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])],data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
+#       cat_table_i<-cate_table(x=factor_var[,i],data=data_keep[,by],
+#                               name=factor_var_name[i],use_preset_level = T,missing = missing)
+#       if(is.null(nrow(cat_table_i))==T){
+#         cat_table_i<-c(cat_table_i,round(chi_test$p.value,2))
+#       }else{cat_table_i<-cbind(cat_table_i,c(round(chi_test$p.value,2),rep(NA,nrow(cat_table_i)-1)))
+#       colnames(cat_table_i)<-NA
+#       }
+#       
+#       
+#       cat_table<-rbind(cat_table,cat_table_i)
+#       
+#     }
+#     colnames(cat_table)<-c(" ",levels(data_keep[,by]),"Overall",paste(compare_level[level_length],"VS",compare_level[1],", p-value",sep=" "))
+#     
+#     for (i in 1:(length(numeric_var))){
+#       t_test<-t.test(numeric_var[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])]~data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
+#       #t_test_conf<-paste(round(t_test$estimate[1]-t_test$estimate[2],3),"(",round(t_test$conf.int,3)[1],",",round(t_test$conf.int,3)[2],")",sep="")
+#       
+#       if(sum(is.na(numeric_var[,i]))==0|missing==F){
+#         cont_table<-rbind(cont_table,c(get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),round(t_test$p.value,2)))
+#       }else if (sum(is.na(numeric_var[,i]))!=0&missing==T){
+#         x_update<-ifelse(is.na(numeric_var[,i])==T,"Missing",numeric_var[,i])
+#         cont_table<-rbind(cont_table,c(get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),round(t_test$p.value,2)),c(get_prop_multi(x_update,"Missing",data_keep[,by]),NA))
+#       }
+#       
+#       
+#     }
+#     
+#     colnames(cont_table)<-c(" ",levels(data_keep[,by]),"Overall",paste(compare_level[level_length],"VS",compare_level[1],", p-value",sep=" "))
+#     
+#     
+#     
+#   }
+#   
+#   
+#   cat_table<-cat_table[2:nrow(cat_table),]
+#   
+#   cont_table<-cont_table[2:nrow(cont_table),]
+#   
+#   char_table=rbind(c("Continuous (Mean(SD))",rep(NA,ncol(cont_table)-1)),cont_table,
+#                    c("Categorical(N(%))",rep(NA,ncol(cont_table)-1)),cat_table)
+#   length_N<-ifelse(compare==F,ncol(char_table),ncol(char_table)-1)
+#   
+#   for (i in 2:length_N){
+#     colnames(char_table)[i]<-paste(levels(data_keep[,by])[i-1]," (N=",prettyNum(sum(data_keep[,by]==levels(data_keep[,by])[i-1]),big.mark = ",", scientific = FALSE),")",sep="")
+#   }
+#   colnames(char_table)[length_N]<-paste("All (N=",prettyNum(nrow(data_keep),big.mark = ",", scientific = FALSE),")",sep="")
+#   rownames(char_table)<-seq(nrow(char_table))
+#   char_table
+#   
+#   
+#   
+# }
+
+
+create_table_1<-function(data,variables_to_select,var_name,by,
+                         compare=F,missing=T,self_define=NULL){
   data_keep<-data[,c(variables_to_select,by)]
   data_cha<-NA
   compare_level<-levels(data_keep[,by])
@@ -938,91 +1239,87 @@ create_table_1<-function(data,variables_to_select,var_name,by,compare=F,missing=
   for (i in 1:length(variables_to_select)){
     data_cha[i]<-class(data_keep[,i])
   }
-  factor_var<-data_keep[,c(which(data_cha=="factor"))]
-  factor_var_name<-c(var_name[which(data_cha=="factor")])
-  cat_table<-NA
-  numeric_var<-data_keep[,c(which(data_cha=="numeric"|data_cha=="integer"))]
-  numeric_var_name<-var_name[which(data_cha=="numeric"|data_cha=="integer")]
-  cont_table<-NA
   
-  if (compare==F){
-    for (i in 1:(length(factor_var))){
+  
+  table_out<-c()
+  for (i in 1:length(variables_to_select)){
+    if(data_cha[i]=="factor"){
       if(missing==T){
-        cat_table<-rbind(cat_table,cate_table(x=factor_var[,i],data=data_keep[,by],name=paste(factor_var_name[i],", N(%)",sep=""),use_preset_level = T))
+        cat_table<-cate_table(x=data_keep[,i],data=data_keep[,by],
+                              name=paste(var_name[i],", N(%)",sep=""),
+                              use_preset_level = T)
       }else{
-        cat_table<-rbind(cat_table,cate_table(x=factor_var[,i],data=data_keep[,by],name=paste(factor_var_name[i],", N(%)",sep=""),use_preset_level = T,missing = F))
+        cat_table<-cate_table(x=data_keep[,i],data=data_keep[,by],
+                              name=paste(var_name[i],", N(%)",sep=""),
+                              use_preset_level = T,missing = F)}
+      
+      if(compare==T){
+        chi_test<-chisq.test(data_keep[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])],
+                             data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
+        
+        if(is.null(nrow(cat_table))==T){
+          cat_table<-c(cat_table,round(chi_test$p.value,2))
+        }else{
+          cat_table<-cbind(cat_table,c(round(chi_test$p.value,2),rep(NA,nrow(cat_table)-1)))}
+        names(cat_table)<-paste0("V",1:ncol(table_out))
+        table_out<-rbind(table_out,cat_table)
+      }else{
+        names(cat_table)<-paste0("V",1:ncol(table_out))
+        table_out<-rbind(table_out,cat_table)
       }
       
       
-    }
-    colnames(cat_table)<-c(" ",levels(data_keep[,by]),"Overall")
-    for (i in 1:(length(numeric_var))){
-      if(sum(is.na(numeric_var[,i]))==0|missing==F){
-        cont_table<-rbind(cont_table,get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define=self_define))
-      }else if (sum(is.na(numeric_var[,i]))!=0&missing==T){
-        x_update<-ifelse(is.na(numeric_var[,i])==T,"Missing",numeric_var[,i])
-        cont_table<-rbind(cont_table,get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),get_prop_multi(x_update,"Missing",data_keep[,by]))
+    }else if(data_cha[i]%in%c("numeric","integer")){
+      
+      if(sum(is.na(data_keep[,i]))==0|missing==F){
+        if(compare==T){
+          t_test<-t.test(data_keep[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])]~data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
+          table_out<-rbind(table_out,c(get_msd_multi(x=data_keep[,i],
+                                                     y=paste(var_name[i],", Mean(SD)",sep=""),
+                                                     z=c(60,10),data=data_keep[,by],self_define=self_define),
+                                       round(t_test$p.value,2)))
+        }else{
+          table_out<-rbind(table_out,get_msd_multi(x=data_keep[,i],
+                                                   y=paste(var_name[i],", Mean(SD)",sep=""),
+                                                   z=c(60,10),data=data_keep[,by],self_define=self_define))}
+        
+      }else if (sum(is.na(data_keep[,i]))!=0&missing==T){
+        x_update<-ifelse(is.na(data_keep[,i])==T,"Missing",numeric_var[,i])
+        if(compare==T){
+          t_test<-t.test(data_keep[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])]~data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
+          rbind(cont_table,c(get_msd_multi(x=data_keep[,i],y=paste(var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),
+                             round(t_test$p.value,2)),c(get_prop_multi(x_update,"Missing",data_keep[,by]),NA))
+        }else{
+          table_out<-rbind(table_out,get_msd_multi(x=data_keep[,i],
+                                                   y=paste(var_name[i],", Mean(SD)",sep=""),
+                                                   z=c(60,10),data=data_keep[,by],
+                                                   self_define = self_define),
+                           get_prop_multi(x_update,"Missing",data_keep[,by]))
+        }
+        
       }
     }
-    
-    colnames(cont_table)<-c(" ",levels(data_keep[,by]),"Overall")
-    
-  }else if (compare==T){
-    for (i in 1:(length(factor_var))){
-      chi_test<-chisq.test(factor_var[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])],data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
-      cat_table_i<-cate_table(x=factor_var[,i],data=data_keep[,by],
-                              name=factor_var_name[i],use_preset_level = T,missing = missing)
-      if(is.null(nrow(cat_table_i))==T){
-        cat_table_i<-c(cat_table_i,round(chi_test$p.value,2))
-      }else{cat_table_i<-cbind(cat_table_i,c(round(chi_test$p.value,2),rep(NA,nrow(cat_table_i)-1)))
-      colnames(cat_table_i)<-NA
-      }
-      
-      
-      cat_table<-rbind(cat_table,cat_table_i)
-      
-    }
-    colnames(cat_table)<-c(" ",levels(data_keep[,by]),"Overall",paste(compare_level[level_length],"VS",compare_level[1],", p-value",sep=" "))
-    
-    for (i in 1:(length(numeric_var))){
-      t_test<-t.test(numeric_var[,i][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])]~data_keep[,by][data_keep[,by]%in%c(compare_level[1],compare_level[level_length])])
-      #t_test_conf<-paste(round(t_test$estimate[1]-t_test$estimate[2],3),"(",round(t_test$conf.int,3)[1],",",round(t_test$conf.int,3)[2],")",sep="")
-      
-      if(sum(is.na(numeric_var[,i]))==0|missing==F){
-        cont_table<-rbind(cont_table,c(get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),round(t_test$p.value,2)))
-      }else if (sum(is.na(numeric_var[,i]))!=0&missing==T){
-        x_update<-ifelse(is.na(numeric_var[,i])==T,"Missing",numeric_var[,i])
-        cont_table<-rbind(cont_table,c(get_msd_multi(x=numeric_var[,i],y=paste(numeric_var_name[i],", Mean(SD)",sep=""),z=c(60,10),data=data_keep[,by],self_define = self_define),round(t_test$p.value,2)),c(get_prop_multi(x_update,"Missing",data_keep[,by]),NA))
-      }
-      
-      
-    }
-    
-    colnames(cont_table)<-c(" ",levels(data_keep[,by]),"Overall",paste(compare_level[level_length],"VS",compare_level[1],", p-value",sep=" "))
-    
-    
-    
   }
-  
-  
-  cat_table<-cat_table[2:nrow(cat_table),]
-  
-  cont_table<-cont_table[2:nrow(cont_table),]
-  
-  char_table=rbind(c("Continuous (Mean(SD))",rep(NA,ncol(cont_table)-1)),cont_table,
-                   c("Categorical(N(%))",rep(NA,ncol(cont_table)-1)),cat_table)
-  length_N<-ifelse(compare==F,ncol(char_table),ncol(char_table)-1)
-  
-  for (i in 2:length_N){
-    colnames(char_table)[i]<-paste(levels(data_keep[,by])[i-1]," (N=",prettyNum(sum(data_keep[,by]==levels(data_keep[,by])[i-1]),big.mark = ",", scientific = FALSE),")",sep="")
+  if(compare==T){
+    colnames(table_out)<-c(" ",levels(data_keep[,by]),"Overall",paste(compare_level[level_length],"VS",compare_level[1],", p-value",sep=" "))
+  }else{
+    colnames(table_out)<-c(" ",levels(data_keep[,by]),"Overall")
   }
-  colnames(char_table)[length_N]<-paste("All (N=",prettyNum(nrow(data_keep),big.mark = ",", scientific = FALSE),")",sep="")
-  rownames(char_table)<-seq(nrow(char_table))
-  char_table
-  
-  
+  rownames(table_out)<-seq(1:nrow(table_out))
+  length_N<-ifelse(compare==F,ncol(table_out)-1,ncol(table_out)-2)
+
+    for (i in 2:length_N){
+      colnames(table_out)[i]<-paste(levels(data_keep[,by])[i-1]," (N=",comma(sum(data_keep[,by]==levels(data_keep[,by])[i-1],na.rm=T)),")",sep="")
+    }
+    colnames(table_out)[length_N+1]<-paste("All (N=",comma(nrow(data_keep[is.na(data_keep[,by])==F,])),")",sep="")
+
+  table_out
   
 }
+
+
+
+
 
 
 
@@ -1095,7 +1392,7 @@ prev_cont_flextable<-function(table,table_caption=NULL){
   
   ncol_table<-ncol(table)
   flex_cont<-my_table(table,y=c(1:3,8),x=1:ncol_table)
-  flex_cont<-footnote(flex_cont,i=c(3,8),j=1,part="body",value = as_paragraph(c("Partially adjusted models adjust for Sex and baseline age. Fully adjusted models additionally adjust for waist-to-hip ratio, systolic and diastolic blood pressure, education attainmen level, smoking status,diabetes at baseline")),ref_symbols = c("*"))
+  flex_cont<-footnote(flex_cont,i=c(3,8),j=1,part="body",value = as_paragraph(c("Partially adjusted models adjust for Sex and baseline age. Fully adjusted models additionally adjust for waist-to-hip ratio, systolic and diastolic blood pressure, education attainment level, smoking status, diabetes at baseline")),ref_symbols = c("*"))
   
   flex_cont<-add_footer_lines(flex_cont,value = as_paragraph(c("The table is ordered by PRSs target ethnicity and publication date")))
   flex_cont <- add_header_row(flex_cont, values =  c(" ", "European PRS","Non-European PRS"),
@@ -1124,7 +1421,7 @@ prev_cont_flextable<-function(table,table_caption=NULL){
   
 }
 
-run_stratified<-function(data,strata_in,outcome,adjustment){
+run_stratified<-function(data,strata_in,outcome,adjustment,se,show_int=F){
   all_strata_outcome<-list()
   for(i in 1: length(strata_in)){
     strata_var<-strata_in[i]
@@ -1142,20 +1439,32 @@ run_stratified<-function(data,strata_in,outcome,adjustment){
       }else{adjustments<-adjustment[!adjustment%in%c(strata_var)]}
       model_output_stratify<-create_output_table(
         trainsplit = F,data_stratified,adjustments=adjustments,
-        outcome=outcome,namew=paste(strata_var,levels(var)[j],sep="_"),roc = F)
+        outcome=outcome,namew=paste(strata_var,levels(var)[j],sep="_"),roc = F,se=se)
       
       strata_outcome_table[[j]]<-model_output_stratify
-      
+      names(strata_outcome_table)[j]<-levels(var)[j]
       
     }
+    if(show_int==T){
+      strata_outcome_table[[length(levels(var))+1]]<-create_output_table(
+        trainsplit = F,data,adjustments=adjustment,
+        outcome=outcome,namew="overall",roc = F,se=se,int = var_in)
+        
+    }
+ 
+    
     all_strata_outcome[[i]]<-strata_outcome_table
+    names(all_strata_outcome)[i]<-strata_in[i]
   }
   
   
   all_strata_outcome[[length(strata_in)+1]]<-create_output_table(
     trainsplit = F,data,adjustments=adjustment,
-    outcome=outcome,namew="overall",roc = F)
+    outcome=outcome,namew="overall",roc = F,se=se)
+ names(all_strata_outcome)[length(strata_in)+1]<-"Overall"
   all_strata_outcome
+  
+  
 }
 
 
@@ -1207,9 +1516,9 @@ stratified_analysis_table<-function(all_strata_outcome, all_name,strata_in,data)
     forest_table<-rbind(forest_table,row_input,make.row.names=F)
     forest_table<-forest_table[2:nrow(forest_table),]
     forest_table$" "<- paste(rep(" ", 40), collapse = " ")
-    colnames(forest_table)<-c(pgsname,"CAD cases", "CAD controls", "estimate","LR","UR"," ","AUC (95%CI)","p-value","   ")
+    colnames(forest_table)<-c(model_table_top[4,pgsname],"CAD cases", "CAD controls", "estimate","LR","UR"," ","AUC (95%CI)","p-value","   ")
     forest_table_list[[i]]<-forest_table
-    
+    names(forest_table_list)[i]<-pgsname
     
   }
   forest_table_list
@@ -1217,7 +1526,43 @@ stratified_analysis_table<-function(all_strata_outcome, all_name,strata_in,data)
 
 
 
-
+run_mediator<-function(data,adjustments,mediator,pgs_name){
+  model_output_table<-data.frame(name=NA,estimate=NA,LR=NA,UR=NA,chi_squared_pvalue=NA,case=NA,control=NA)
+  
+  for(i in 1:(length(mediator)+1)){
+    if(i==1){
+      model_output_table[i,"name"]<-model_table_top[4,pgs_name]
+      adjustments=adjustments_in
+      data_in<-na.omit(data%>%select(IID,all_of(c(outcome,adjustments)),pgs_name))
+      model_output<-run_glm(data=data_in,adjustments,outcome,pgs_name)
+      or_ci<-format(ci(model_output,roundup=2),nsmall=2)
+      model_ori<-run_glm(data=data_in,adjustments,outcome,pgs_name = NULL)
+      model_compare<-anova(model_ori,model_output,test = "Chisq")
+      chisqured=format(signif(model_compare$`Pr(>Chi)`[2],2),nsmall=2)
+      
+      
+    }else{
+      model_output_table[i,"name"]<-paste("+",mediator_name[i-1])
+      adjustments<-c(adjustments_in,mediator[1:i-1])
+      adjustments_ori<-adjustments[1:(length(adjustments)-1)]
+      data_in<-na.omit(data%>%select(IID,all_of(c(outcome,adjustments)),pgs_name))
+      model_output<-run_glm(data=data_in,adjustments,outcome,pgs_name)
+      or_ci<-format(ci(model_output,roundup=2),nsmall=2)
+      model_ori<-run_glm(data=data_in,adjustments_ori,outcome,pgs_name = pgs_name)
+      model_compare<-anova(model_ori,model_output,test = "Chisq")
+      chisqured=format(signif(model_compare$`Pr(>Chi)`[2],2),nsmall=2)
+    }
+    model_output_table[i,2:7]<-c(or_ci[1],or_ci[2],
+                                 or_ci[3],chisqured,
+                                 table(data_in[,outcome])["1"], table(data_in[,outcome])["0"])
+    
+    model_output_table$" "<-paste(model_output_table$estimate," (",model_output_table$LR,"-",model_output_table$UR,")",sep="")
+    model_output_table$"CAD case/control"<-paste(model_output_table$case,"/",model_output_table$control,sep="")
+    model_output_table$"  "<- paste(rep(" ", 40), collapse = " ")
+    
+  }
+  model_output_table
+}
 
 #create_output_table(trainsplit = F, model_type = "simple",cat_or_cont = "cont",full_adjustments = full_adjustments,outcome="prevalent_CHD_EPA")
 

@@ -1,0 +1,58 @@
+---
+title: "Polygenic prediction of coronary artery disease among 130,000 Mexican adults"
+author: "Tianshu Liu"
+date: "2024-06-03"
+output:
+  officedown::rdocx_document:
+    reference_docx: /well/emberson/users/hma817/projects/existing_PRS/margin_template.docx
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(officedown)
+library(officer)
+rm(list=ls())
+#set working directory load package-----------------
+working_path<-'/well/emberson/users/hma817/projects/existing_PRS/correction'
+data_path<-paste(working_path,'/data',sep='')
+graphs_path<-paste(working_path,'/graphs',sep='')
+setwd(working_path)
+
+library(flextable)
+```
+
+
+
+
+\newpage
+
+```{r,echo=FALSE,tab.id="table1"}
+ft<-readRDS(paste(data_path,"/manuscript-age80/table1_nomissing_flex_80.rds",sep=""))
+ft
+```
+
+
+<!---BLOCK_LANDSCAPE_START--->
+
+```{r fig.width = 10,fig.id = "fig1",fig.height=6.5,echo=FALSE,fig.cap="Genetic predisposition to CAD risk in Mexicans aged 35-80 years  \nThe odd ratios for subsequent risk from CAD (defined as (self-reported) medical diagnosis of CAD at baseline and any mention anywhere in the deaths certificate of CAD) given one standard deviation (SD) increase in polygenic risk score (PRS) across eight selected PRSs derived from external sources, were estimated with continuous regression models partially adjusted for sex, age at baseline and ancestry admixture in the MCPS population. In fully adjusted models, additional adjustments included measured waist-to-hip ratio, systolic and diastolic blood pressures, reported smoking status, level of education attainment, and presence of diabetes at baseline (diagnosed, treated or HbA1c >6.5%). Analyses were restricted to eligible participants with complete data on all covariates (see footnote of Table 1 for details).. "}
+knitr::include_graphics(paste(graphs_path,"/manuscript-age80/Figure1_logistic_forestEPA_age80.png",sep=""))
+```
+
+
+
+```{r fig.width = 10,fig.id = "fig2",fig.height=6.5,echo=FALSE,fig.cap="Association of PRS quintiles with CAD risk in Mexicans aged 35-80 years, by quintiles of PRSs  \nOdd ratios (OR) were estimated with regression models adjusted for sex and age at baseline. The odds ratio (on log scale) for each of the five quintiles of the eight selected PRSs are plotted against their respective mean PRS in each quintile. The 95% confidence intervals estimated by floating absolute risk are presented as vertical error bars through each point. The size of each estimate point is inversely proportional to their respective standard error. The ORs and the number of CAD cases within each quintile are displayed above and below the corresponding error bar. "}
+knitr::include_graphics(paste(graphs_path,"/manuscript-age80/Figure2_primaryFAR_ggplot__Partial.png",sep=""))
+```
+
+<!---BLOCK_LANDSCAPE_STOP--->
+
+```{r fig.width = 6,fig.id = "fig3",fig.height=10,echo=FALSE,fig.cap="Genetic predisposition to CAD risk at ages 35 to 80 years, independent of conventional vascular risk factors  \nAnalyses as per Figure 1, now with stepwise adjustments for each established risk factor considered separately, in the order indicated in the forestplot. Changes in estimated ORs are estimated by the chi-squared statistics."}
+knitr::include_graphics(paste(graphs_path,"/manuscript-age80/Figure3_mediator_plot.png",sep=""))
+```
+
+<!---BLOCK_LANDSCAPE_START--->
+```{r fig.width = 11,fig.height=6.5,fig.id = "fig4",echo=FALSE,fig.cap="Sex-specific genetic predisposition to CAD risk in Mexican men and women aged 35-80 years  \nAnalyses as per Figure 1, now separately in men and in women.",fig.align="center"}
+knitr::include_graphics(paste(graphs_path,"/manuscript-age80/Figure4_logistic_forestplotEPA_sex.png",sep=""))
+```
+<!---BLOCK_LANDSCAPE_STOP--->
